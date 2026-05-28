@@ -1,0 +1,77 @@
+{
+  "schema_version": "b_scene_plan.v2.1",
+  "selected_style": "뉴스/이슈 요약형",
+  "style_reason": "사용자 제공 요약을 기반으로 안전하게 맥락을 정리하는 형식이 적합합니다.",
+  "target_duration_sec": 34,
+  "scene_plan": [
+    {
+      "scene_id": "s01",
+      "duration_sec": 8,
+      "purpose": "hook",
+      "screen_text": "왜 이렇게 번졌을까?",
+      "visual_direction": "질문형 자막과 단순한 배경으로 시작합니다.",
+      "image_slot_description": "논란의 분위기를 상징하는 중립적 이미지",
+      "narration_intent": "사건을 단정하지 않고 궁금증을 제기합니다.",
+      "source_basis": [
+        "사용자 제공 요약",
+        "사용자 제공 후킹 포인트"
+      ],
+      "do_not_say": [
+        "실명/닉네임 추정 금지",
+        "범죄 단정 금지"
+      ]
+    },
+    {
+      "scene_id": "s02",
+      "duration_sec": 9,
+      "purpose": "context",
+      "screen_text": "핵심은 이 부분",
+      "visual_direction": "요약 카드처럼 핵심 맥락을 보여줍니다.",
+      "image_slot_description": "상황 설명에 맞는 추상적 배경 이미지",
+      "narration_intent": "사용자가 제공한 요약 범위 안에서 배경을 설명합니다.",
+      "source_basis": [
+        "사용자 제공 요약"
+      ],
+      "do_not_say": [
+        "원문 직접 인용 금지",
+        "허위 수치 금지"
+      ]
+    },
+    {
+      "scene_id": "s03",
+      "duration_sec": 9,
+      "purpose": "turn",
+      "screen_text": "반응이 갈린 이유",
+      "visual_direction": "좌우 대비 구도로 반응이 갈리는 느낌을 줍니다.",
+      "image_slot_description": "의견이 나뉘는 상황을 표현한 중립적 이미지",
+      "narration_intent": "논쟁 포인트를 단정 없이 소개합니다.",
+      "source_basis": [
+        "사용자 제공 쇼츠화 이유"
+      ],
+      "do_not_say": [
+        "개인정보 언급 금지",
+        "실명/닉네임 노출 금지"
+      ]
+    },
+    {
+      "scene_id": "s04",
+      "duration_sec": 8,
+      "purpose": "payoff",
+      "screen_text": "결론은 조심스럽게",
+      "visual_direction": "마무리 카드로 과도한 단정을 피합니다.",
+      "image_slot_description": "중립적 마무리 느낌의 이미지",
+      "narration_intent": "확인되지 않은 사실을 단정하지 말고 정리합니다.",
+      "source_basis": [
+        "사용자 제공 리스크 플래그"
+      ],
+      "do_not_say": [
+        "범죄 단정 금지",
+        "원문 직접 인용 금지"
+      ]
+    }
+  ],
+  "risk_flags": [
+    "원문 직접 인용 금지",
+    "실명/닉네임 추정 금지"
+  ]
+}

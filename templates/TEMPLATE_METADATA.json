@@ -1,0 +1,12 @@
+{
+  "template_id": "kdenlive_vertical_1080x1920_30fps_dev_stub",
+  "schema_version": "template_metadata.v2.1",
+  "canvas": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30
+  },
+  "status": "dev_only_placeholder",
+  "warning": "This is not a production-ready Kdenlive template. Use only self-generated templates and validate generated project files before manual editing.",
+  "external_input_trusted": false
+}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Dev-only placeholder template for Shorts Pipeline v2.1.
+  This file is self-generated repository scaffolding, not a production-ready
+  Kdenlive template. Do not treat external .kdenlive files as trusted input.
+-->
+<mlt title="shorts_pipeline_v2_1_dev_stub" version="7.0.0">
+  <profile description="vertical 1080x1920 30fps" width="1080" height="1920" frame_rate_num="30" frame_rate_den="1" progressive="1" sample_aspect_num="1" sample_aspect_den="1" display_aspect_num="9" display_aspect_den="16" colorspace="709"/>
+  <producer id="black" in="00:00:00.000" out="00:00:01.000">
+    <property name="mlt_service">color</property>
+    <property name="resource">#000000</property>
+  </producer>
+  <playlist id="main_bin"/>
+  <tractor id="tractor0" in="00:00:00.000" out="00:00:01.000">
+    <track producer="black"/>
+  </tractor>
+</mlt>

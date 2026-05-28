@@ -1,0 +1,15 @@
+{
+  "candidate_id": "cand_001",
+  "title": "Manual source candidate",
+  "source_url": "https://example.com/community/post/123",
+  "community": "example_community",
+  "collected_at": "2026-05-29T01:00:00+09:00",
+  "summary": "A user-written summary of the source idea without full source text.",
+  "hook": "A small decision creates a larger conflict.",
+  "why_shortable": "The situation has a clear setup, reversal, and takeaway.",
+  "risk_flags_for_user": [
+    "avoid identity inference",
+    "avoid unsupported legal claims"
+  ],
+  "status": "new"
+}

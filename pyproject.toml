@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shorts-pipeline"
+version = "0.1.0"
+description = "Local semi-automated Shorts production pipeline MVP"
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic>=2.0",
+  "python-dotenv>=1.0",
+  "pillow>=10.0",
+  "lxml>=5.0",
+  "python-dateutil>=2.9",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.4",
+]
+ui = [
+  "streamlit>=1.0",
+]
+llm = [
+  "openai>=1.0",
+  "anthropic>=0.0",
+  "google-genai>=1.0",
+]
+
+[project.scripts]
+shorts-pipeline-dev = "shorts_pipeline.dev_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
