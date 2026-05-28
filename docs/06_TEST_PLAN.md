@@ -78,6 +78,8 @@
   unknown project IDs, unsafe artifact paths, and clean JSON stdout.
 - GitHub Actions CI checks run ruff, pytest, a network/provider import guard,
   and an obvious-secret guard on `main`, `codex/**`, and PRs to `main`.
+- Baseline audit doc tests check required sections and key governance, state,
+  CI, inventory, and non-goal claims.
 
 Future phases:
 
