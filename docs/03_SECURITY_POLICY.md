@@ -94,6 +94,25 @@ E providers are injected test/mock boundaries in the local skeleton. No real LLM
 API client, network call, scraping, TTS, rendering, or uploading belongs in this
 phase.
 
+## F Kdenlive Skeleton Safety
+
+F generation is a local editing handoff only. It must generate MLT/Kdenlive XML
+from validated local `timeline.json`, `d_image_manifest.json`, and
+`e_script.json` artifacts.
+
+Forbidden:
+
+- Parsing, copying, trusting, or mutating external `.kdenlive` files.
+- Absolute paths, `../` traversal, or external URLs in XML resources.
+- Raw source posts, comments, raw HTML, screenshots, API keys, secrets, tokens,
+  passwords, EXIF/GPS metadata, OCR output, or facial-recognition metadata in
+  XML or F artifacts.
+- Running Kdenlive or melt.
+- Rendering, uploading, TTS, voice synthesis, BGM generation, or provider calls.
+
+F output must keep project status at `script_generated` and must not imply that
+final editing, recording, rendering, or upload has happened.
+
 ## Dev Smoke CLI Safety
 
 The dev smoke CLI must require the explicit `--use-fake-providers` flag. It must
