@@ -80,6 +80,22 @@ python -m shorts_pipeline.dev_cli inspect \
 The inspect command is read-only. It does not run smoke, call fake or real
 providers, render, upload, or mutate Kdenlive XML.
 
+## CI
+
+GitHub Actions runs the local test suite and lint checks on `main`, `codex/**`
+branch pushes, and pull requests to `main`.
+
+CI runs:
+
+```bash
+python -m ruff check .
+python -m pytest
+```
+
+It installs only the package plus dev dependencies. It does not install LLM
+provider extras, call real APIs, scrape, render, upload, or mutate production
+Kdenlive XML.
+
 ## Dev GitHub Workflow
 
 Initial repository state is pushed to `main`.
