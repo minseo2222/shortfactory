@@ -107,6 +107,13 @@ must not create or modify DB rows, must not write files, and must not call the
 smoke pipeline or provider code. Stored artifact paths are untrusted input and
 must be validated before any file existence or SHA-256 check.
 
+## CI Safety
+
+GitHub Actions CI must use only dev dependencies, not the optional LLM provider
+extras. CI may install Python dependencies from package indexes, but must not
+require API keys, call real providers, scrape, render, upload, or mutate
+production Kdenlive XML.
+
 ## Collection Safety
 
 Default configuration:

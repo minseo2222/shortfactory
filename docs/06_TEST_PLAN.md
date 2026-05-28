@@ -76,6 +76,8 @@
 - Dev inspect CLI tests cover read-only project lookup, status-event output,
   artifact row output, file/hash verification, strict mode, missing DB/root,
   unknown project IDs, unsafe artifact paths, and clean JSON stdout.
+- GitHub Actions CI checks run ruff, pytest, a network/provider import guard,
+  and an obvious-secret guard on `main`, `codex/**`, and PRs to `main`.
 
 Future phases:
 

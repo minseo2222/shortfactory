@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: pytest and ruff
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package and dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Ruff
+        run: python -m ruff check .
+
+      - name: Pytest
+        run: python -m pytest
+
+      - name: Safety scan for real network/provider imports
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          roots = [Path("src"), Path("tests")]
+          pattern = re.compile(
+              r"^\s*(import|from)\s+"
+              r"(openai|anthropic|google_genai|google\.genai|requests|httpx|"
+              r"urllib\.request|urllib3|selenium|playwright)\b",
+              re.MULTILINE,
+          )
+
+          matches = []
+          for root in roots:
+              if not root.exists():
+                  continue
+              for path in root.rglob("*.py"):
+                  text = path.read_text(encoding="utf-8")
+                  if pattern.search(text):
+                      matches.append(str(path))
+
+          if matches:
+              print("Forbidden network/provider imports found:")
+              for item in matches:
+                  print(f"- {item}")
+              sys.exit(1)
+          print("No forbidden network/provider imports found.")
+          PY
+
+      - name: Safety scan for obvious committed secrets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          roots = [Path("src"), Path("tests"), Path(".github")]
+          secret_patterns = [
+              re.compile(r"ghp_[A-Za-z0-9_]{20,}"),
+              re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),
+              re.compile(r"sk-[A-Za-z0-9]{20,}"),
+              re.compile(r"OPENAI_API_KEY\s*=\s*['\"][^'\"]+['\"]"),
+              re.compile(r"ANTHROPIC_API_KEY\s*=\s*['\"][^'\"]+['\"]"),
+              re.compile(r"GEMINI_API_KEY\s*=\s*['\"][^'\"]+['\"]"),
+          ]
+
+          matches = []
+          for root in roots:
+              if not root.exists():
+                  continue
+              for path in root.rglob("*"):
+                  if not path.is_file():
+                      continue
+                  if path.suffix not in {".py", ".yml", ".yaml", ".toml", ".md"}:
+                      continue
+                  text = path.read_text(encoding="utf-8", errors="ignore")
+                  for pattern in secret_patterns:
+                      if pattern.search(text):
+                          matches.append(str(path))
+                          break
+
+          if matches:
+              print("Possible committed secrets found:")
+              for item in matches:
+                  print(f"- {item}")
+              sys.exit(1)
+          print("No obvious committed secrets found.")
+          PY
