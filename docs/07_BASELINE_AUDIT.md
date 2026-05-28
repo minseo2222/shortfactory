@@ -8,9 +8,10 @@
 - Base SHA: `4c0500ca856b888da1ad1b93b28f7c5f7a6984ec`
 - Working branch: `codex/014-baseline-audit`
 - Branch protection verification: succeeded with `gh api`
-- Local tests: passed with `python -m pytest` (`115 passed`)
+- Local tests: passed with `python -m pytest` (`117 passed`)
 - Ruff: passed with `python -m ruff check .`
 - Scope: documentation and repository-governance verification only
+- Text hygiene: LF line endings and no hidden/bidirectional controls in selected text files
 
 ## Repository Governance
 
@@ -44,6 +45,7 @@ restrictions: null
 ### Root
 
 - `.env.example` - empty local environment template; no committed real secrets.
+- `.gitattributes` - enforces LF line endings for repository text files.
 - `.gitignore` - excludes Python caches, virtualenvs, local DBs, local projects, exports, media,
   and secret files.
 - `AGENTS.md` - Codex operating rules, hard boundaries, and GitHub branch workflow.
@@ -137,6 +139,8 @@ restrictions: null
 - `tests/test_timeline.py` - start-time accumulation and scene order coverage.
 - `tests/test_ci_workflow.py` - CI workflow trigger, dependency, action-version, pytest, Ruff,
   network/provider guard, and secret guard checks.
+- `tests/test_text_file_hygiene.py` - LF line-ending and hidden Unicode control checks for
+  selected repo text files.
 
 ## Runtime Architecture Summary
 
@@ -349,8 +353,8 @@ archival from `completed`.
 
 ## Test Coverage Summary
 
-Current test suite on this branch is expected to include the baseline tests plus this audit-doc
-test. The pre-audit `main` suite had 114 tests.
+Current test suite on this branch includes the baseline tests plus audit-doc and text-hygiene
+tests. The pre-audit `main` suite had 114 tests.
 
 - `tests/test_models.py` - model and fixture validation, timeline creation, D readiness helper.
 - `tests/test_project_creation.py` - A service happy path, ID sequence, source storage, rollback,
@@ -371,6 +375,8 @@ test. The pre-audit `main` suite had 114 tests.
 - `tests/test_timeline.py` - start-time helper.
 - `tests/test_ci_workflow.py` - CI workflow contract.
 - `tests/test_baseline_audit_doc.py` - baseline audit document structure and key claims.
+- `tests/test_text_file_hygiene.py` - LF line-ending and hidden/bidirectional Unicode control
+  checks for selected repository text files.
 
 CI also runs `python -m ruff check .` and `python -m pytest`.
 
@@ -395,6 +401,8 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 - No production Kdenlive XML mutation exists.
 - External `.kdenlive` files are not trusted or parsed as inputs.
 - Dev inspect is read-only and does not call smoke, providers, or DB initialization.
+- Text hygiene tests block CRLF/CR-only line endings and hidden/bidirectional Unicode controls
+  in selected tracked text files.
 
 ## CI Summary
 
