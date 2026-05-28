@@ -12,6 +12,10 @@ def test_github_actions_ci_workflow_has_required_checks() -> None:
     assert "push:" in text
     assert "- main" in text
     assert '"codex/**"' in text
+    assert "actions/checkout@v6" in text
+    assert "actions/setup-python@v6" in text
+    assert "actions/checkout@v4" not in text
+    assert "actions/setup-python@v5" not in text
     assert 'python-version: "3.11"' in text
     assert 'python -m pip install -e ".[dev]"' in text
     assert ".[dev,llm]" not in text
