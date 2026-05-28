@@ -125,6 +125,8 @@ Done when:
   concise human-readable summary.
 - The read-only dev inspect CLI can report project status events, artifact rows,
   file existence, hash matches, and strict artifact problems without mutation.
+- The protected-main baseline audit documents the current modules, contracts,
+  DB tables, state transitions, CLI surface, CI, security boundaries, and gaps.
 - Status events include A/B/C/D/E transitions.
 - DB rows and SHA-256 artifact records are verified end to end.
 - Broader multi-sample and Kdenlive manual-open smoke tests remain future work.

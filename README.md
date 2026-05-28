@@ -96,6 +96,11 @@ It installs only the package plus dev dependencies. It does not install LLM
 provider extras, call real APIs, scrape, render, upload, or mutate production
 Kdenlive XML.
 
+## Baseline Audit
+
+The protected-main repository baseline is summarized in
+[`docs/07_BASELINE_AUDIT.md`](docs/07_BASELINE_AUDIT.md).
+
 ## Dev GitHub Workflow
 
 Initial repository state is pushed to `main`.
