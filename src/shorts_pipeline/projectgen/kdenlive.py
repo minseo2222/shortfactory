@@ -120,7 +120,7 @@ def build_kdenlive_mlt_tree(manifest: FKdenliveManifest) -> ET.ElementTree:
 
 
 def write_kdenlive_project_xml(path: Path, manifest: FKdenliveManifest) -> Path:
-    """Write a self-generated Kdenlive/MLT XML skeleton to disk."""
+    """Write the self-generated Kdenlive/MLT XML skeleton to disk."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tree = build_kdenlive_mlt_tree(manifest)
     tree.write(path, encoding="utf-8", xml_declaration=True, short_empty_elements=True)

@@ -1,4 +1,8 @@
-"""Phase 6/F self-generated Kdenlive project skeleton service."""
+"""Phase 6/F self-generated Kdenlive project skeleton service.
+
+This module writes only local editing handoff artifacts from validated project
+JSON. It does not parse external Kdenlive files or run rendering tools.
+"""
 
 from __future__ import annotations
 
@@ -186,7 +190,11 @@ def validate_f_kdenlive_manifest_against_inputs(
         raise FKdenliveValidationError("manifest project_id must match timeline")
     if d_manifest.project_id != timeline.project_id:
         raise FKdenliveValidationError("D manifest project_id must match timeline")
-    if manifest.canvas_width != 1080 or manifest.canvas_height != 1920 or manifest.fps != FPS:
+    if (
+        manifest.canvas_width != 1080
+        or manifest.canvas_height != 1920
+        or manifest.fps != FPS
+    ):
         raise FKdenliveValidationError("manifest canvas must be 1080x1920 at 30fps")
     if abs(manifest.total_duration_sec - timeline.total_duration_sec) > 0.001:
         raise FKdenliveValidationError("manifest duration must match timeline")
@@ -254,7 +262,10 @@ def validate_generated_kdenlive_xml(
     profile = profiles[0]
     if profile.attrib.get("width") != "1080" or profile.attrib.get("height") != "1920":
         raise FKdenliveValidationError("generated Kdenlive profile must be 1080x1920")
-    if profile.attrib.get("frame_rate_num") != "30" or profile.attrib.get("frame_rate_den") != "1":
+    if (
+        profile.attrib.get("frame_rate_num") != "30"
+        or profile.attrib.get("frame_rate_den") != "1"
+    ):
         raise FKdenliveValidationError("generated Kdenlive profile must be 30fps")
     if len(root.findall("playlist")) < 2:
         raise FKdenliveValidationError("generated Kdenlive XML requires image and text playlists")

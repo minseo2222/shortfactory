@@ -1,3 +1,5 @@
+"""Tests for Phase 6/F local Kdenlive skeleton generation."""
+
 from __future__ import annotations
 
 import json
