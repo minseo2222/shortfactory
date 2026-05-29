@@ -100,7 +100,8 @@ restrictions: null
 - `src/shorts_pipeline/f_service.py` - Phase F self-generated Kdenlive/MLT skeleton generation,
   manifest/XML validation, manual guide writing, artifact persistence, and rollback.
 - `src/shorts_pipeline/smoke.py` - deterministic local A to E integration smoke runner.
-- `src/shorts_pipeline/dev_cli.py` - dev-only `smoke` and read-only `inspect` CLI commands.
+- `src/shorts_pipeline/dev_cli.py` - dev-only `smoke`, read-only `inspect`, and
+  local-write `generate-kdenlive` CLI commands.
 - `src/shorts_pipeline/dev_fakes.py` - deterministic fake B and E providers for local smoke runs.
 - `src/shorts_pipeline/inspect.py` - read-only project inspection API.
 - `src/shorts_pipeline/llm/__init__.py` - LLM helper package marker.
@@ -138,6 +139,8 @@ restrictions: null
   required args, directory creation, and clean stdout.
 - `tests/test_dev_inspect_cli.py` - read-only inspect CLI, mutation checks, missing DB/root,
   artifact problems, hash mismatch, unsafe paths, strict mode, and verification skip flags.
+- `tests/test_dev_cli_kdenlive.py` - dev Kdenlive CLI confirmation gate, JSON/human output,
+  required args, unknown project, wrong status, and no-rendering flags.
 - `tests/test_db.py` - SQLite initialization and status CHECK constraint coverage.
 - `tests/test_security.py` - path traversal, absolute path, external URL, media extension,
   and XML escaping coverage.
@@ -161,7 +164,7 @@ manual candidate
 -> E script/title
 -> F Kdenlive handoff
 -> smoke runner
--> dev CLI / inspect CLI
+-> dev CLI / inspect CLI / Kdenlive CLI
 ```
 
 The runtime services are intentionally small and phase-scoped:
@@ -376,6 +379,19 @@ archival from `completed`.
 - Safety behavior: validates stored artifact paths before file access; reports missing files,
   unsafe paths, and hash mismatches without repairing anything.
 
+### `python -m shorts_pipeline.dev_cli generate-kdenlive`
+
+- Purpose: generate Phase F local Kdenlive handoff artifacts for an existing
+  `script_generated` project.
+- Required flags: `--db-path`, `--projects-root`, `--project-id`, and
+  `--confirm-local-write`.
+- Optional flags: `--json`.
+- Writes: `project.kdenlive`, `f_kdenlive_manifest.json`, and
+  `notes/manual_kdenlive_editing.md` under the existing project folder.
+- Safety behavior: uses the existing self-generated F service; does not render, run Kdenlive or
+  melt, generate TTS/audio, upload, call providers, read API keys, or trust external
+  `.kdenlive` files.
+
 ### `shorts-pipeline-dev`
 
 - Purpose: console entry point for the same dev CLI.
@@ -403,6 +419,8 @@ tests. The pre-audit `main` suite had 114 tests.
 - `tests/test_integration_smoke.py` - full A to E smoke path and negative smoke behavior.
 - `tests/test_dev_cli.py` - smoke CLI behavior.
 - `tests/test_dev_inspect_cli.py` - inspect CLI behavior and read-only guarantees.
+- `tests/test_dev_cli_kdenlive.py` - Kdenlive CLI confirmation gate, JSON/human output,
+  required args, unknown project, wrong status, and no-rendering flags.
 - `tests/test_db.py` - schema and status constraint.
 - `tests/test_security.py` - path and XML helpers.
 - `tests/test_state_machine.py` - transition rules.
@@ -437,6 +455,7 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 - F Kdenlive skeleton output is self-generated from validated local artifacts, uses safe
   relative local paths only, keeps status at `script_generated`, and does not run Kdenlive,
   melt, rendering, TTS, upload, providers, or network calls.
+- The dev Kdenlive CLI requires explicit `--confirm-local-write` before invoking the F service.
 - Dev inspect is read-only and does not call smoke, providers, or DB initialization.
 - Text hygiene tests block CRLF/CR-only line endings and hidden/bidirectional Unicode controls
   in selected tracked text files.
@@ -474,9 +493,8 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Recommended Next Implementation Slice
 
-Add a dev-only CLI command for Phase 6/F Kdenlive skeleton generation, reusing the existing
-`generate_f_kdenlive_project(...)` backend without rendering, upload, TTS, or external
-`.kdenlive` trust.
+Merge and verify the dev-only Phase 6/F Kdenlive CLI wrapper, then plan a manual Kdenlive-open
+smoke check that still avoids rendering, upload, TTS, and external `.kdenlive` trust.
 
 ## GPT Pro Review Notes
 
@@ -485,4 +503,4 @@ Add a dev-only CLI command for Phase 6/F Kdenlive skeleton generation, reusing t
 - Verify CI/protection status through GitHub.
 - Verify no real LLM provider, Kdenlive production mutation, render, upload, TTS, or UI scope was
   added by the F skeleton branch.
-- Decide whether the next task should be the dev-only F CLI hook or UI.
+- Decide whether the next task should be a manual Kdenlive-open smoke check or UI.
