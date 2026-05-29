@@ -114,6 +114,8 @@ Goals:
 - Manual source -> B -> C -> D -> E happy path.
 - Status history and artifact/DB verification for the local backend path.
 - Dev-only CLI wrapper for the deterministic local smoke path.
+- Phase 6/F self-generated Kdenlive/MLT skeleton handoff from timeline, D
+  manifest, and E script.
 - Kdenlive manual-open smoke test in a later production-project phase.
 
 Done when:
@@ -127,6 +129,9 @@ Done when:
   file existence, hash matches, and strict artifact problems without mutation.
 - The protected-main baseline audit documents the current modules, contracts,
   DB tables, state transitions, CLI surface, CI, security boundaries, and gaps.
+- F generation writes `project.kdenlive`, `f_kdenlive_manifest.json`, and
+  `notes/manual_kdenlive_editing.md` without rendering, TTS, upload, provider
+  calls, or external `.kdenlive` trust, and keeps status at `script_generated`.
 - Status events include A/B/C/D/E transitions.
 - DB rows and SHA-256 artifact records are verified end to end.
 - Broader multi-sample and Kdenlive manual-open smoke tests remain future work.

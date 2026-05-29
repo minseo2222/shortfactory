@@ -14,9 +14,9 @@ generates local project files for later manual editing in Kdenlive.
 - B: structured scene plan generation contract.
 - C: canonical `timeline.json` contract.
 - C: placeholder image slots and text overlay PNG generation.
-- C: self-generated Kdenlive project file only.
 - D: user-confirmed image insertion manifest.
 - E: narration and title candidate contract.
+- F: self-generated local Kdenlive/MLT skeleton handoff from C/D/E artifacts.
 
 ## Explicit Non-Goals
 
@@ -49,6 +49,20 @@ This repository currently implements the first scaffold round:
 - Keep generated project artifacts under the configured `projects/` root.
 - Reject absolute paths, `../` traversal, and external URL media resources.
 - Use only self-generated Kdenlive templates and project files.
+
+## F Kdenlive Skeleton
+
+Phase 6/F can generate a local editing handoff from a `script_generated`
+project:
+
+- `project.kdenlive`
+- `f_kdenlive_manifest.json`
+- `notes/manual_kdenlive_editing.md`
+
+The Kdenlive file is self-generated from validated `timeline.json`,
+`d_image_manifest.json`, and `e_script.json`. It does not parse or trust
+external `.kdenlive` files, render video, run Kdenlive or melt, generate TTS, or
+upload anything. The project status remains `script_generated`.
 
 ## Dev Smoke CLI
 

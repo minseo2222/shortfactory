@@ -16,6 +16,12 @@
 - E application validation for narration scene matching, recommended-title
   membership, direct-copy blocking, unsupported numeric titles, hard overclaims,
   forbidden-claims guards, speakability, and raw-source fields.
+- FKdenliveManifest validation, deterministic frame calculations, source
+  artifact references, safe relative resource paths, and no external-template or
+  rendering flags.
+- Generated Kdenlive/MLT XML validation for root/profile shape, resource
+  existence, safe paths, D image resources, timeline text overlays, and forbidden
+  raw-source/API-secret terms.
 - State transition validation.
 - Safe path validation.
 - External URL resource rejection.
@@ -76,6 +82,11 @@
 - Dev inspect CLI tests cover read-only project lookup, status-event output,
   artifact row output, file/hash verification, strict mode, missing DB/root,
   unknown project IDs, unsafe artifact paths, and clean JSON stdout.
+- Phase 6/F tests cover Kdenlive skeleton generation after A to E, D-confirmed
+  image paths, timeline text overlays, manifest/XML validation, manual editing
+  guide safety notes, artifact SHA-256 records, wrong status, missing inputs, D
+  readiness failure, unsafe paths, forbidden XML terms, and rollback on write
+  failure.
 - GitHub Actions CI checks run ruff, pytest, a network/provider import guard,
   and an obvious-secret guard on `main`, `codex/**`, and PRs to `main`.
 - Baseline audit doc tests check required sections and key governance, state,
@@ -83,7 +94,6 @@
 
 Future phases:
 
-- Timeline -> Kdenlive XML parse.
 - Multi-sample smoke runs.
 
 ## Manual Smoke Tests

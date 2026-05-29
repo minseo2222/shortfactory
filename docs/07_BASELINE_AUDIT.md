@@ -97,6 +97,8 @@ restrictions: null
   rights gate, hashes, persistence, and E readiness helper.
 - `src/shorts_pipeline/e_service.py` - Phase E provider-injected script/title generation,
   safe context construction, validation, retry, persistence, and status transition.
+- `src/shorts_pipeline/f_service.py` - Phase F self-generated Kdenlive/MLT skeleton generation,
+  manifest/XML validation, manual guide writing, artifact persistence, and rollback.
 - `src/shorts_pipeline/smoke.py` - deterministic local A to E integration smoke runner.
 - `src/shorts_pipeline/dev_cli.py` - dev-only `smoke` and read-only `inspect` CLI commands.
 - `src/shorts_pipeline/dev_fakes.py` - deterministic fake B and E providers for local smoke runs.
@@ -110,6 +112,8 @@ restrictions: null
 - `src/shorts_pipeline/projectgen/placeholder.py` - local Pillow placeholder PNG generation.
 - `src/shorts_pipeline/projectgen/text_overlay.py` - local transparent text overlay PNG generation.
 - `src/shorts_pipeline/projectgen/replace_images.py` - local replacement instruction Markdown generation.
+- `src/shorts_pipeline/projectgen/kdenlive.py` - standard-library XML builder for the
+  self-generated F Kdenlive/MLT skeleton.
 
 ### Tests
 
@@ -126,6 +130,8 @@ restrictions: null
   rights and safety blockers, and E readiness gate.
 - `tests/test_e_script_generation.py` - Phase E D-readiness requirement, provider injection,
   retry, validators, persistence, status transition, and rollback.
+- `tests/test_f_kdenlive_project.py` - Phase F Kdenlive skeleton generation, XML/manifest
+  validation, artifact hashes, safety blockers, status preservation, and rollback.
 - `tests/test_integration_smoke.py` - deterministic A to E smoke path, artifacts, DB rows,
   status history, and negative smoke behavior.
 - `tests/test_dev_cli.py` - dev smoke CLI JSON/human output, fake-provider gate, fixed clock,
@@ -153,6 +159,7 @@ manual candidate
 -> C timeline/assets
 -> D image manifest
 -> E script/title
+-> F Kdenlive handoff
 -> smoke runner
 -> dev CLI / inspect CLI
 ```
@@ -164,6 +171,8 @@ The runtime services are intentionally small and phase-scoped:
 - C compiles deterministic timeline data and local PNG assets.
 - D creates and confirms the image manifest and blocks unsafe E input.
 - E accepts an injected provider and writes validated narration/title output.
+- F generates local Kdenlive/MLT skeleton handoff files from validated C/D/E
+  artifacts without rendering or external `.kdenlive` trust.
 - Smoke composes the local A to E path with deterministic fake providers.
 - Inspect reads existing DB rows and artifact files without mutation.
 
@@ -184,6 +193,9 @@ The runtime services are intentionally small and phase-scoped:
   paths, image notes, source type, rights confirmation, risk flags, and SHA-256.
 - `EScript`, `NarrationLine`, and `TitleCandidate` - `e_script.v2.1`; one narration line per
   timeline scene, title candidates, recommended title, and forbidden claims.
+- `FKdenliveManifest` and `FKdenliveSceneRef` - `f_kdenlive_project.v2.1`; local Kdenlive
+  skeleton handoff metadata, deterministic frame references, D-confirmed image paths, timeline
+  text overlay paths, source artifact references, and explicit no-template/no-render flags.
 - `ProjectStatusEvent` - append-only status history item with from/to status, stage, reason,
   and timestamp.
 - `SmokeRunResult` and `SmokeArtifactCheck` - local smoke verification result, not persisted
@@ -214,6 +226,8 @@ foreign keys and request WAL mode for write paths. Read-only inspection uses `mo
   JSON, artifact path, and timestamp.
 - `scripts` - one E script row per project; stores schema version, optional LLM run ID,
   narration JSON, title candidates JSON, recommended title, artifact path, and timestamp.
+- F outputs reuse `artifacts` rows for `kdenlive_project`, `f_kdenlive_manifest`, and
+  `manual_kdenlive_editing_guide`; no F-specific table is added.
 - `project_status_events` - append-only status transition history.
 - `events` - generic event table retained for future event records.
 
@@ -315,6 +329,22 @@ archival from `completed`.
 - Explicit non-goals: no real provider, no network, no TTS, no voice synthesis, no rendering,
   and no upload.
 
+### F. Kdenlive Skeleton
+
+- Input artifacts: `source.json`, `timeline.json`, ready `d_image_manifest.json`,
+  `e_script.json`, and project row in `script_generated`.
+- Output artifacts: `project.kdenlive`, `f_kdenlive_manifest.json`, and
+  `notes/manual_kdenlive_editing.md`.
+- DB rows: F `artifacts` rows only; no new F table and no status-event row.
+- Status transition: none. Project status remains `script_generated`.
+- Validation gate: source/timeline/D/E Pydantic validation, D readiness validation, E scene
+  matching, manifest-to-input validation, deterministic frame calculations, safe relative
+  resource paths, generated XML parse/profile/resource checks, local file existence checks,
+  SHA-256 artifact records, and forbidden raw-source/API-secret term checks in XML.
+- Explicit non-goals: no external `.kdenlive` parsing, no Kdenlive or melt execution, no
+  rendering, no TTS or voice synthesis, no BGM generation, no upload, no provider calls,
+  and no new status progression.
+
 ### Smoke Path
 
 - Input artifacts: deterministic fictional manual fixture and injected fake B/E providers.
@@ -366,6 +396,10 @@ tests. The pre-audit `main` suite had 114 tests.
   unsafe flags, path, image, dimension, note, rights, face, hash, and forbidden field blockers.
 - `tests/test_e_script_generation.py` - E happy path, D readiness requirement, provider gate,
   retry, validators, wrong status, forbidden fields, and rollback.
+- `tests/test_f_kdenlive_project.py` - F happy path, D-confirmed image resources, timeline
+  text overlay resources, deterministic frames, manual guide notes, blocked statuses,
+  missing/invalid inputs, unsafe paths, forbidden XML terms, no external template use, and
+  rollback.
 - `tests/test_integration_smoke.py` - full A to E smoke path and negative smoke behavior.
 - `tests/test_dev_cli.py` - smoke CLI behavior.
 - `tests/test_dev_inspect_cli.py` - inspect CLI behavior and read-only guarantees.
@@ -400,6 +434,9 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 - No TTS, rendering, uploading, or YouTube behavior exists.
 - No production Kdenlive XML mutation exists.
 - External `.kdenlive` files are not trusted or parsed as inputs.
+- F Kdenlive skeleton output is self-generated from validated local artifacts, uses safe
+  relative local paths only, keeps status at `script_generated`, and does not run Kdenlive,
+  melt, rendering, TTS, upload, providers, or network calls.
 - Dev inspect is read-only and does not call smoke, providers, or DB initialization.
 - Text hygiene tests block CRLF/CR-only line endings and hidden/bidirectional Unicode controls
   in selected tracked text files.
@@ -422,9 +459,10 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 - No real LLM provider adapter exists yet.
 - No Streamlit UI exists yet.
-- No production Kdenlive project generation exists yet.
-- C currently generates canonical local files and PNG assets, but not a production
-  `project.kdenlive`.
+- No production Kdenlive project generation exists yet; Phase 6/F is a local
+  self-generated editing skeleton only and still requires manual Kdenlive verification.
+- C currently generates canonical local files and PNG assets; F now generates a local
+  skeleton `project.kdenlive` but does not prove full production edit compatibility.
 - No rendering, TTS, voice synthesis, BGM generation, upload, or YouTube workflow exists.
 - Smoke uses deterministic fake providers, so it proves local contracts but not provider quality.
 - Baseline audit is hand-authored and should be reviewed against the repository tree by GPT Pro.
@@ -436,8 +474,9 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Recommended Next Implementation Slice
 
-Phase 6/F: self-generated Kdenlive project skeleton from `timeline.json`, `d_image_manifest.json`,
-and `e_script.json`, without rendering and without trusting external `.kdenlive` files.
+Add a dev-only CLI command for Phase 6/F Kdenlive skeleton generation, reusing the existing
+`generate_f_kdenlive_project(...)` backend without rendering, upload, TTS, or external
+`.kdenlive` trust.
 
 ## GPT Pro Review Notes
 
@@ -445,5 +484,5 @@ and `e_script.json`, without rendering and without trusting external `.kdenlive`
 - Verify state transitions and DB table descriptions against `state_machine.py` and `db.py`.
 - Verify CI/protection status through GitHub.
 - Verify no real LLM provider, Kdenlive production mutation, render, upload, TTS, or UI scope was
-  added by this audit branch.
-- Decide whether the next task should be the Kdenlive skeleton or UI.
+  added by the F skeleton branch.
+- Decide whether the next task should be the dev-only F CLI hook or UI.

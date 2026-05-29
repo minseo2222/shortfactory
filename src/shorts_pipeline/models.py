@@ -308,6 +308,70 @@ class EScript(StrictModel):
         return self
 
 
+class FKdenliveSceneRef(StrictModel):
+    scene_id: SceneId = Field(pattern=r"^s\d{2}$")
+    image_slot_id: SlotId = Field(pattern=r"^slot_\d{3}$")
+    start_sec: float = Field(ge=0.0)
+    duration_sec: float = Field(gt=1.0, le=12.0)
+    start_frame: int = Field(ge=0)
+    duration_frames: int = Field(gt=0)
+    image_path: str
+    text_overlay_path: str
+    narration_script_present: bool = True
+
+    @field_validator("image_path", "text_overlay_path")
+    @classmethod
+    def paths_must_be_project_relative(cls, value: str) -> str:
+        _reject_external_or_traversal(value)
+        return value
+
+
+class FKdenliveManifest(StrictModel):
+    schema_version: Literal["f_kdenlive_project.v2.1"] = "f_kdenlive_project.v2.1"
+    project_id: str = Field(pattern=r"^PRJ_\d{8}_\d{4}$")
+    kdenlive_project_path: str = "project.kdenlive"
+    canvas_width: int = 1080
+    canvas_height: int = 1920
+    fps: int = 30
+    total_duration_sec: float = Field(ge=30.0, le=60.0)
+    total_frames: int = Field(gt=0)
+    scenes: list[FKdenliveSceneRef] = Field(min_length=4, max_length=12)
+    source_artifacts: dict[str, str]
+    generated_at: datetime
+    generated_by: str = "shortfactory"
+    external_template_used: bool = False
+    rendering_performed: bool = False
+    warnings: list[str] = Field(default_factory=list, max_length=30)
+
+    @field_validator("kdenlive_project_path")
+    @classmethod
+    def kdenlive_path_must_be_project_relative(cls, value: str) -> str:
+        _reject_external_or_traversal(value)
+        return value
+
+    @field_validator("source_artifacts")
+    @classmethod
+    def source_artifact_paths_must_be_project_relative(
+        cls,
+        value: dict[str, str],
+    ) -> dict[str, str]:
+        for path in value.values():
+            _reject_external_or_traversal(path)
+        return value
+
+    @model_validator(mode="after")
+    def validate_manifest_consistency(self) -> "FKdenliveManifest":
+        if self.canvas_width != 1080 or self.canvas_height != 1920 or self.fps != 30:
+            raise ValueError("F Kdenlive manifest must be 1080x1920 at 30fps")
+        if self.total_frames != round(self.total_duration_sec * self.fps):
+            raise ValueError("total_frames must equal rounded total duration frames")
+        if self.external_template_used:
+            raise ValueError("external_template_used must be false")
+        if self.rendering_performed:
+            raise ValueError("rendering_performed must be false")
+        return self
+
+
 class ProjectStatusEvent(StrictModel):
     project_id: str = Field(pattern=r"^PRJ_\d{8}_\d{4}$")
     from_status: str | None = None
