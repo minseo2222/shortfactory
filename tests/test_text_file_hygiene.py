@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import unicodedata
 from pathlib import Path
 
@@ -26,6 +27,13 @@ BLOCKED_TEXT_CHARS = {
 }
 
 ALLOWED_CONTROL_CHARS = {"\n"}
+PSEUDO_NEWLINE_BYTES = {
+    "U+2028": "\u2028".encode(),
+    "U+2029": "\u2029".encode(),
+    "U+0085": "\u0085".encode(),
+    "VT": b"\x0b",
+    "FF": b"\x0c",
+}
 
 
 def _selected_text_paths() -> list[Path]:
@@ -82,6 +90,54 @@ def _line_stats(path: Path, data: bytes, text: str) -> str:
     )
 
 
+def _git_blob_bytes(ref: str, path: Path) -> bytes:
+    return subprocess.check_output(["git", "show", f"{ref}:{path.as_posix()}"])
+
+
+def _byte_level_failures(label: str, path: Path, data: bytes) -> list[str]:
+    failures: list[str] = []
+    text = data.decode("utf-8")
+    stats = f"{label} {_line_stats(path, data, text)}"
+
+    if b"\r\n" in data:
+        failures.append(f"{stats}: contains CRLF line endings")
+    elif b"\r" in data:
+        failures.append(f"{stats}: contains CR-only line endings")
+
+    lf_count = data.count(b"\n")
+    if len(data) > 200 and lf_count == 0:
+        failures.append(f"{stats}: file is larger than 200 bytes with no LF bytes")
+    if len(data) > 1000 and lf_count < 5:
+        failures.append(f"{stats}: file is larger than 1000 bytes with fewer than 5 LF bytes")
+
+    for name, value in PSEUDO_NEWLINE_BYTES.items():
+        count = data.count(value)
+        if count:
+            failures.append(f"{stats}: contains {count} {name} pseudo-newline/control bytes")
+
+    for index, char in enumerate(text):
+        category = unicodedata.category(char)
+        if (
+            char not in BLOCKED_TEXT_CHARS
+            and category != "Cf"
+            and category not in {"Zl", "Zp"}
+            and not (category == "Cc" and char not in ALLOWED_CONTROL_CHARS)
+        ):
+            continue
+        line_no = text.count("\n", 0, index) + 1
+        line_start = text.rfind("\n", 0, index) + 1
+        column_no = index - line_start + 1
+        label_text = BLOCKED_TEXT_CHARS.get(
+            char,
+            f"{category} {unicodedata.name(char, 'UNKNOWN CONTROL')}",
+        )
+        failures.append(
+            f"{stats}:{line_no}:{column_no}: U+{ord(char):04X} {label_text}"
+        )
+
+    return failures
+
+
 def test_hygiene_test_file_is_included_in_scan_scope() -> None:
     assert Path("tests/test_text_file_hygiene.py") in _selected_text_paths()
 
@@ -90,18 +146,7 @@ def test_selected_text_files_use_lf_line_endings() -> None:
     failures: list[str] = []
 
     for path in _selected_text_paths():
-        data = path.read_bytes()
-        text = data.decode("utf-8")
-        stats = _line_stats(path, data, text)
-        if b"\r\n" in data:
-            failures.append(f"{stats}: contains CRLF line endings")
-        elif b"\r" in data:
-            failures.append(f"{stats}: contains CR-only line endings")
-        lf_count = data.count(b"\n")
-        if len(data) > 200 and lf_count == 0:
-            failures.append(f"{stats}: file is larger than 200 bytes with no LF bytes")
-        if len(data) > 1000 and lf_count < 5:
-            failures.append(f"{stats}: file is larger than 1000 bytes with fewer than 5 LF bytes")
+        failures.extend(_byte_level_failures("WT", path, path.read_bytes()))
 
     assert not failures, "\n".join(failures)
 
@@ -203,5 +248,18 @@ def test_selected_text_files_do_not_use_non_lf_logical_line_separators() -> None
             failures.append(
                 f"{_line_stats(path, data, text)}: possible non-LF line separators"
             )
+
+    assert not failures, "\n".join(failures)
+
+
+def test_head_git_blobs_use_real_lf_line_endings_and_no_controls() -> None:
+    failures: list[str] = []
+
+    for path in _selected_text_paths():
+        try:
+            data = _git_blob_bytes("HEAD", path)
+        except subprocess.CalledProcessError:
+            continue
+        failures.extend(_byte_level_failures("HEAD", path, data))
 
     assert not failures, "\n".join(failures)
