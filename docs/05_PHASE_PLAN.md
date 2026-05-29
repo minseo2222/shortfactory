@@ -130,6 +130,8 @@ Done when:
 - The dev Kdenlive CLI can generate Phase 6/F local editing handoff artifacts
   for an existing `script_generated` project with explicit
   `--confirm-local-write`.
+- The dev smoke runner and CLI can optionally run F with explicit `run_f=True`
+  or `--run-f`, while the default smoke path remains A to E.
 - The protected-main baseline audit documents the current modules, contracts,
   DB tables, state transitions, CLI surface, CI, security boundaries, and gaps.
 - F generation writes `project.kdenlive`, `f_kdenlive_manifest.json`, and

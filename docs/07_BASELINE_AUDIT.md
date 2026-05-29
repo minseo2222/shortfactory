@@ -99,7 +99,8 @@ restrictions: null
   safe context construction, validation, retry, persistence, and status transition.
 - `src/shorts_pipeline/f_service.py` - Phase F self-generated Kdenlive/MLT skeleton generation,
   manifest/XML validation, manual guide writing, artifact persistence, and rollback.
-- `src/shorts_pipeline/smoke.py` - deterministic local A to E integration smoke runner.
+- `src/shorts_pipeline/smoke.py` - deterministic local A to E integration smoke runner
+  with optional F handoff verification.
 - `src/shorts_pipeline/dev_cli.py` - dev-only `smoke`, read-only `inspect`, and
   local-write `generate-kdenlive` CLI commands.
 - `src/shorts_pipeline/dev_fakes.py` - deterministic fake B and E providers for local smoke runs.
@@ -176,7 +177,8 @@ The runtime services are intentionally small and phase-scoped:
 - E accepts an injected provider and writes validated narration/title output.
 - F generates local Kdenlive/MLT skeleton handoff files from validated C/D/E
   artifacts without rendering or external `.kdenlive` trust.
-- Smoke composes the local A to E path with deterministic fake providers.
+- Smoke composes the local A to E path with deterministic fake providers, and can
+  explicitly opt into F handoff generation and verification.
 - Inspect reads existing DB rows and artifact files without mutation.
 
 ## Data Contracts Summary
@@ -352,10 +354,14 @@ archival from `completed`.
 
 - Input artifacts: deterministic fictional manual fixture and injected fake B/E providers.
 - Output artifacts: full local A to E artifact set in a temp or configured project root.
+  With explicit F opt-in, also writes `project.kdenlive`, `f_kdenlive_manifest.json`,
+  and `notes/manual_kdenlive_editing.md`.
 - DB rows: project, B, C, D, E, artifact, LLM-run, and status-event records.
-- Status transition: complete A to E sequence ending in `script_generated`.
+- Status transition: complete A to E sequence ending in `script_generated`; optional F
+  does not add a status transition.
 - Validation gate: reloads and validates JSON artifacts, checks generated files, verifies DB rows,
-  validates status history, and verifies artifact hashes.
+  validates status history, and verifies artifact hashes. Optional F also validates the F
+  manifest, parses `project.kdenlive`, verifies F artifact rows, and confirms SHA-256 values.
 - Explicit non-goals: no real providers, no external media, no rendering, no upload, no UI.
 
 ## CLI Surface Summary
@@ -364,9 +370,10 @@ archival from `completed`.
 
 - Purpose: run the deterministic local A to E smoke path.
 - Required flags: `--db-path`, `--projects-root`, `--use-fake-providers`.
-- Optional flags: `--fixed-clock`, `--json`.
+- Optional flags: `--fixed-clock`, `--run-f`, `--json`.
 - Writes: local SQLite DB and local generated project files under the provided paths.
-- Safety behavior: requires explicit fake-provider opt-in; does not read API keys; does not call
+- Safety behavior: requires explicit fake-provider opt-in; `--run-f` additionally generates
+  and verifies local F handoff files without rendering; does not read API keys; does not call
   real providers; does not scrape, download media, render, upload, TTS, or mutate production
   Kdenlive XML.
 
@@ -416,8 +423,9 @@ tests. The pre-audit `main` suite had 114 tests.
   text overlay resources, deterministic frames, manual guide notes, blocked statuses,
   missing/invalid inputs, unsafe paths, forbidden XML terms, no external template use, and
   rollback.
-- `tests/test_integration_smoke.py` - full A to E smoke path and negative smoke behavior.
-- `tests/test_dev_cli.py` - smoke CLI behavior.
+- `tests/test_integration_smoke.py` - full A to E smoke path, optional F smoke path,
+  artifact checks, and negative smoke behavior.
+- `tests/test_dev_cli.py` - smoke CLI behavior, including optional `--run-f`.
 - `tests/test_dev_inspect_cli.py` - inspect CLI behavior and read-only guarantees.
 - `tests/test_dev_cli_kdenlive.py` - Kdenlive CLI confirmation gate, JSON/human output,
   required args, unknown project, wrong status, and no-rendering flags.
@@ -493,8 +501,8 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Recommended Next Implementation Slice
 
-Merge and verify the dev-only Phase 6/F Kdenlive CLI wrapper, then plan a manual Kdenlive-open
-smoke check that still avoids rendering, upload, TTS, and external `.kdenlive` trust.
+Add a manual Kdenlive-open verification checklist for generated `project.kdenlive` files that
+still avoids rendering, upload, TTS, and external `.kdenlive` trust.
 
 ## GPT Pro Review Notes
 
@@ -503,4 +511,4 @@ smoke check that still avoids rendering, upload, TTS, and external `.kdenlive` t
 - Verify CI/protection status through GitHub.
 - Verify no real LLM provider, Kdenlive production mutation, render, upload, TTS, or UI scope was
   added by the F skeleton branch.
-- Decide whether the next task should be a manual Kdenlive-open smoke check or UI.
+- Decide whether the next task should be a manual Kdenlive-open smoke checklist or UI.

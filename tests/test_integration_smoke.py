@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import sqlite3
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 from typing import Any, get_args
@@ -15,6 +16,7 @@ from shorts_pipeline.models import (
     BScenePlan,
     DImageManifest,
     EScript,
+    FKdenliveManifest,
     NarrationPace,
     SmokeRunResult,
     SourceArtifact,
@@ -29,6 +31,11 @@ from shorts_pipeline.smoke import (
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
+F_ARTIFACT_TYPES = {
+    "kdenlive_project",
+    "f_kdenlive_manifest",
+    "manual_kdenlive_editing_guide",
+}
 
 
 def fixed_clock() -> datetime:
@@ -155,7 +162,11 @@ def fetch_all(db_path: Path, sql: str, params: tuple[Any, ...] = ()) -> list[sql
         conn.close()
 
 
-def run_smoke(tmp_path) -> tuple[Path, Path, FakeBProvider, FakeEProvider, SmokeRunResult]:
+def run_smoke(
+    tmp_path,
+    *,
+    run_f: bool = False,
+) -> tuple[Path, Path, FakeBProvider, FakeEProvider, SmokeRunResult]:
     db_path = tmp_path / "shorts.sqlite3"
     projects_root = tmp_path / "projects"
     b_provider = FakeBProvider()
@@ -166,8 +177,44 @@ def run_smoke(tmp_path) -> tuple[Path, Path, FakeBProvider, FakeEProvider, Smoke
         clock=fixed_clock,
         b_provider=b_provider,
         e_provider=e_provider,
+        run_f=run_f,
     )
     return db_path, projects_root, b_provider, e_provider, result
+
+
+def f_output_paths(projects_root: Path, project_id: str) -> list[Path]:
+    project_dir = projects_root / project_id
+    return [
+        project_dir / "project.kdenlive",
+        project_dir / "f_kdenlive_manifest.json",
+        project_dir / "notes" / "manual_kdenlive_editing.md",
+    ]
+
+
+def assert_no_f_outputs_or_artifacts(
+    db_path: Path,
+    projects_root: Path,
+    project_id: str,
+) -> None:
+    for path in f_output_paths(projects_root, project_id):
+        assert not path.exists()
+    assert (
+        fetch_all(
+            db_path,
+            """
+            SELECT artifact_type
+            FROM artifacts
+            WHERE project_id = ?
+              AND artifact_type IN (
+                'kdenlive_project',
+                'f_kdenlive_manifest',
+                'manual_kdenlive_editing_guide'
+              )
+            """,
+            (project_id,),
+        )
+        == []
+    )
 
 
 def test_end_to_end_smoke_happy_path(tmp_path) -> None:
@@ -228,6 +275,66 @@ def test_end_to_end_smoke_happy_path(tmp_path) -> None:
     assert result.db_table_counts["image_manifests"] == 1
     assert result.db_table_counts["scripts"] == 1
     assert result.db_table_counts["llm_runs"] == 2
+
+
+def test_default_smoke_does_not_generate_f_outputs(tmp_path) -> None:
+    db_path, projects_root, _b_provider, _e_provider, result = run_smoke(tmp_path)
+
+    assert result.final_status == "script_generated"
+    assert result.status_sequence == EXPECTED_STATUS_SEQUENCE
+    assert F_ARTIFACT_TYPES.isdisjoint({check.name for check in result.artifact_checks})
+    assert_no_f_outputs_or_artifacts(db_path, projects_root, result.project_id)
+
+
+def test_optional_smoke_with_f_generates_and_verifies_handoff(tmp_path) -> None:
+    db_path, projects_root, _b_provider, _e_provider, result = run_smoke(tmp_path, run_f=True)
+
+    assert result.final_status == "script_generated"
+    assert result.status_sequence == EXPECTED_STATUS_SEQUENCE
+    project_dir = projects_root / result.project_id
+    for path in f_output_paths(projects_root, result.project_id):
+        assert path.is_file()
+
+    manifest = FKdenliveManifest.model_validate(
+        json.loads((project_dir / "f_kdenlive_manifest.json").read_text(encoding="utf-8"))
+    )
+    assert manifest.project_id == result.project_id
+    assert manifest.external_template_used is False
+    assert manifest.rendering_performed is False
+    assert ET.parse(project_dir / "project.kdenlive").getroot().tag == "mlt"
+
+    checks_by_name = {check.name: check for check in result.artifact_checks}
+    assert F_ARTIFACT_TYPES.issubset(checks_by_name)
+    for name in F_ARTIFACT_TYPES:
+        check = checks_by_name[name]
+        path = project_dir / ensure_relative_project_path(check.relative_path)
+        assert check.exists is True
+        assert path.is_file()
+        assert check.sha256 == sha256_file(path)
+
+    f_rows = fetch_all(
+        db_path,
+        """
+        SELECT artifact_type, relative_path, sha256
+        FROM artifacts
+        WHERE project_id = ?
+          AND artifact_type IN (
+            'kdenlive_project',
+            'f_kdenlive_manifest',
+            'manual_kdenlive_editing_guide'
+          )
+        """,
+        (result.project_id,),
+    )
+    assert {row["artifact_type"] for row in f_rows} == F_ARTIFACT_TYPES
+    for row in f_rows:
+        path = projects_root / ensure_relative_project_path(row["relative_path"])
+        assert row["sha256"] == sha256_file(path)
+
+    row = fetch_one(db_path, "SELECT status FROM projects WHERE id = ?", (result.project_id,))
+    assert row["status"] == "script_generated"
+    events = list_project_status_events(db_path, result.project_id)
+    assert [event.to_status for event in events] == EXPECTED_STATUS_SEQUENCE
 
 
 def test_status_history_is_persisted(tmp_path) -> None:
@@ -336,3 +443,31 @@ def test_smoke_failure_does_not_fake_success(tmp_path) -> None:
         "SELECT * FROM artifacts WHERE project_id = ? AND artifact_type = ?",
         (project_id, "e_script"),
     ) == []
+
+
+def test_optional_f_failure_does_not_fake_smoke_success(tmp_path, monkeypatch) -> None:
+    db_path = tmp_path / "shorts.sqlite3"
+    projects_root = tmp_path / "projects"
+
+    def fail_f_generation(*args: Any, **kwargs: Any) -> None:
+        raise RuntimeError("simulated F generation failure")
+
+    monkeypatch.setattr(
+        "shorts_pipeline.smoke.generate_f_kdenlive_project",
+        fail_f_generation,
+    )
+
+    with pytest.raises(RuntimeError, match="simulated F generation failure"):
+        run_local_smoke_pipeline(
+            db_path=db_path,
+            projects_root=projects_root,
+            clock=fixed_clock,
+            b_provider=FakeBProvider(),
+            e_provider=FakeEProvider(),
+            run_f=True,
+        )
+
+    project_id = "PRJ_20260529_0001"
+    row = fetch_one(db_path, "SELECT status FROM projects WHERE id = ?", (project_id,))
+    assert row["status"] == "script_generated"
+    assert_no_f_outputs_or_artifacts(db_path, projects_root, project_id)

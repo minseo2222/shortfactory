@@ -78,7 +78,7 @@
   SHA-256 records, DB rows, and status history.
 - Dev smoke CLI tests cover JSON output, human-readable output, explicit fake
   provider gating, fixed-clock parsing, required path arguments, local directory
-  creation, and clean JSON stdout.
+  creation, optional `--run-f` F handoff generation, and clean JSON stdout.
 - Dev inspect CLI tests cover read-only project lookup, status-event output,
   artifact row output, file/hash verification, strict mode, missing DB/root,
   unknown project IDs, unsafe artifact paths, and clean JSON stdout.
@@ -90,6 +90,8 @@
   guide safety notes, artifact SHA-256 records, wrong status, missing inputs, D
   readiness failure, unsafe paths, forbidden XML terms, and rollback on write
   failure.
+- Optional F smoke tests cover default A to E behavior, explicit F generation
+  after E, F artifact checks, status preservation, and failure propagation.
 - GitHub Actions CI checks run ruff, pytest, a network/provider import guard,
   and an obvious-secret guard on `main`, `codex/**`, and PRs to `main`.
 - Baseline audit doc tests check required sections and key governance, state,

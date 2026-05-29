@@ -56,6 +56,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Required explicit opt-in to deterministic dev-only fake providers.",
     )
     smoke.add_argument(
+        "--run-f",
+        action="store_true",
+        help=(
+            "Optionally run Phase F after E and verify local Kdenlive handoff "
+            "artifacts. Does not render or run Kdenlive/melt."
+        ),
+    )
+    smoke.add_argument(
         "--json",
         action="store_true",
         help="Print only the SmokeRunResult JSON object to stdout.",
@@ -155,6 +163,14 @@ def _print_human_result(result: SmokeRunResult) -> None:
     print(f"Final status: {result.final_status}")
     print(f"Status sequence: {' -> '.join(result.status_sequence)}")
     print(f"Artifacts checked: {len(result.artifact_checks)}")
+    artifact_names = {check.name for check in result.artifact_checks}
+    if {
+        "kdenlive_project",
+        "f_kdenlive_manifest",
+        "manual_kdenlive_editing_guide",
+    }.issubset(artifact_names):
+        print("F Kdenlive skeleton generated: true")
+        print("Rendering performed: false")
 
 
 def _print_human_inspection(result: ProjectInspectionResult) -> None:
@@ -223,6 +239,7 @@ def _run_smoke_command(args: argparse.Namespace) -> int:
         clock=clock,
         b_provider=DevFakeBProvider(),
         e_provider=DevFakeEProvider(),
+        run_f=args.run_f,
     )
     if args.json:
         print(json.dumps(result.model_dump(mode="json"), indent=2, ensure_ascii=False))

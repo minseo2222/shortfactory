@@ -81,6 +81,22 @@ This is a local developer check only. It uses deterministic fake providers and
 does not call real APIs, scrape, download images, render, upload, run TTS, or
 mutate production Kdenlive XML.
 
+Optionally run Phase F after E and verify the local Kdenlive handoff artifacts:
+
+```bash
+shorts-pipeline-dev smoke \
+  --db-path ./.local/shorts_pipeline.sqlite3 \
+  --projects-root ./.local/projects \
+  --use-fake-providers \
+  --run-f
+```
+
+Default smoke remains A to E and ends at `script_generated`. `--run-f`
+additionally generates and verifies `project.kdenlive`,
+`f_kdenlive_manifest.json`, and `notes/manual_kdenlive_editing.md`. It does not
+render, run Kdenlive or melt, generate TTS, upload, call providers, or trust
+external `.kdenlive` files.
+
 Inspect an existing local project without mutating DB rows or files:
 
 ```bash
