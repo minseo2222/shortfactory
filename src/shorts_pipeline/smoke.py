@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +20,10 @@ from shorts_pipeline.d_service import (
 )
 from shorts_pipeline.db import connect_db, init_db, list_project_status_events
 from shorts_pipeline.e_service import generate_e_script
+from shorts_pipeline.f_service import (
+    generate_f_kdenlive_project,
+    validate_generated_kdenlive_xml,
+)
 from shorts_pipeline.llm.b_provider import BScenePlanProvider
 from shorts_pipeline.llm.e_provider import EScriptProvider
 from shorts_pipeline.models import (
@@ -26,6 +31,7 @@ from shorts_pipeline.models import (
     CandidateCard,
     DImageManifest,
     EScript,
+    FKdenliveManifest,
     SmokeArtifactCheck,
     SmokeRunResult,
     SourceArtifact,
@@ -45,6 +51,12 @@ EXPECTED_STATUS_SEQUENCE = [
     "waiting_for_user_images",
     "images_inserted",
     "script_generated",
+]
+
+F_ARTIFACT_RELATIVE_PATHS = [
+    ("kdenlive_project", "project.kdenlive"),
+    ("f_kdenlive_manifest", "f_kdenlive_manifest.json"),
+    ("manual_kdenlive_editing_guide", "notes/manual_kdenlive_editing.md"),
 ]
 
 
@@ -172,6 +184,53 @@ def _build_artifact_checks(project_dir: Path, timeline: TimelineJson) -> list[Sm
     return checks
 
 
+def _build_f_artifact_checks(project_dir: Path) -> list[SmokeArtifactCheck]:
+    checks: list[SmokeArtifactCheck] = []
+    for name, relative_path in F_ARTIFACT_RELATIVE_PATHS:
+        safe_relative_path = ensure_relative_project_path(relative_path).as_posix()
+        path = ensure_path_under_root(project_dir, project_dir / safe_relative_path)
+        checks.append(
+            SmokeArtifactCheck(
+                name=name,
+                relative_path=safe_relative_path,
+                exists=path.is_file(),
+                sha256=sha256_file(path) if path.is_file() else None,
+            )
+        )
+    return checks
+
+
+def _verify_f_outputs(project_dir: Path, manifest: FKdenliveManifest) -> None:
+    manifest_path = ensure_path_under_root(project_dir, project_dir / "f_kdenlive_manifest.json")
+    xml_path = ensure_path_under_root(project_dir, project_dir / "project.kdenlive")
+    guide_path = ensure_path_under_root(
+        project_dir,
+        project_dir / "notes" / "manual_kdenlive_editing.md",
+    )
+    for path in (xml_path, manifest_path, guide_path):
+        if not path.is_file():
+            raise SmokeVerificationError(f"missing F artifact: {path.relative_to(project_dir)}")
+
+    reloaded_manifest = FKdenliveManifest.model_validate(
+        json.loads(manifest_path.read_text(encoding="utf-8"))
+    )
+    if reloaded_manifest != manifest:
+        raise SmokeVerificationError("F manifest on disk does not match service result")
+    if manifest.external_template_used:
+        raise SmokeVerificationError("F manifest unexpectedly used an external template")
+    if manifest.rendering_performed:
+        raise SmokeVerificationError("F manifest unexpectedly reports rendering")
+
+    try:
+        xml_root = ET.parse(xml_path).getroot()
+    except ET.ParseError as exc:
+        raise SmokeVerificationError("project.kdenlive XML did not parse") from exc
+    if xml_root.tag != "mlt":
+        raise SmokeVerificationError("project.kdenlive root is not mlt")
+
+    validate_generated_kdenlive_xml(xml_path, project_root=project_dir, manifest=manifest)
+
+
 def _fetch_project_status(conn: sqlite3.Connection, project_id: str) -> str:
     row = conn.execute("SELECT status FROM projects WHERE id = ?", (project_id,)).fetchone()
     if row is None:
@@ -211,6 +270,36 @@ def _verify_artifact_rows(conn: sqlite3.Connection, *, projects_root: Path, proj
             raise SmokeVerificationError(f"artifact row points to missing file: {relative_path}")
         if row["sha256"] and row["sha256"] != sha256_file(actual_path):
             raise SmokeVerificationError(f"artifact sha256 mismatch: {relative_path}")
+
+
+def _verify_f_artifact_rows(conn: sqlite3.Connection, *, projects_root: Path, project_id: str) -> None:
+    root = Path(projects_root).resolve()
+    expected_types = {name for name, _relative_path in F_ARTIFACT_RELATIVE_PATHS}
+    rows = conn.execute(
+        """
+        SELECT artifact_type, relative_path, sha256
+        FROM artifacts
+        WHERE project_id = ?
+          AND artifact_type IN (
+            'kdenlive_project',
+            'f_kdenlive_manifest',
+            'manual_kdenlive_editing_guide'
+          )
+        """,
+        (project_id,),
+    ).fetchall()
+    found_types = {row["artifact_type"] for row in rows}
+    if found_types != expected_types:
+        missing = ", ".join(sorted(expected_types - found_types))
+        raise SmokeVerificationError(f"missing F artifact rows: {missing}")
+
+    for row in rows:
+        relative_path = ensure_relative_project_path(row["relative_path"])
+        actual_path = ensure_path_under_root(root, root / relative_path)
+        if not actual_path.is_file():
+            raise SmokeVerificationError(f"F artifact row points to missing file: {relative_path}")
+        if row["sha256"] != sha256_file(actual_path):
+            raise SmokeVerificationError(f"F artifact sha256 mismatch: {relative_path}")
 
 
 def _verify_db_records(conn: sqlite3.Connection, project_id: str) -> dict[str, int]:
@@ -255,8 +344,9 @@ def run_local_smoke_pipeline(
     clock: Callable[[], datetime] | None = None,
     b_provider: BScenePlanProvider | None = None,
     e_provider: EScriptProvider | None = None,
+    run_f: bool = False,
 ) -> SmokeRunResult:
-    """Run one deterministic local manual fixture through A -> B -> C -> D -> E."""
+    """Run one deterministic local fixture through A -> E, optionally verifying F."""
     if b_provider is None:
         raise SmokeProviderNotConfiguredError("B provider must be injected for smoke runs")
     if e_provider is None:
@@ -318,6 +408,15 @@ def run_local_smoke_pipeline(
     project_dir = ensure_path_under_root(root, root / project_id)
     _load_json_artifacts(project_dir)
     artifact_checks = _build_artifact_checks(project_dir, timeline)
+    if run_f:
+        f_manifest = generate_f_kdenlive_project(
+            project_id,
+            db_path=db_path,
+            projects_root=projects_root,
+            clock=clock,
+        )
+        _verify_f_outputs(project_dir, f_manifest)
+        artifact_checks.extend(_build_f_artifact_checks(project_dir))
     if any(not check.exists for check in artifact_checks):
         missing = ", ".join(check.relative_path for check in artifact_checks if not check.exists)
         raise SmokeVerificationError(f"missing generated artifacts: {missing}")
@@ -329,6 +428,8 @@ def run_local_smoke_pipeline(
         if final_status != "script_generated":
             raise SmokeVerificationError("final project status is not script_generated")
         _verify_artifact_rows(conn, projects_root=projects_root, project_id=project_id)
+        if run_f:
+            _verify_f_artifact_rows(conn, projects_root=projects_root, project_id=project_id)
         counts = _verify_db_records(conn, project_id)
     finally:
         conn.close()
