@@ -105,7 +105,11 @@ def generate_kdenlive_args(
     return args
 
 
-def assert_no_f_outputs_or_artifacts(db_path: Path, projects_root: Path, project_id: str) -> None:
+def assert_no_f_outputs_or_artifacts(
+    db_path: Path,
+    projects_root: Path,
+    project_id: str,
+) -> None:
     for path in f_output_paths(projects_root, project_id):
         assert not path.exists()
     assert f_artifact_rows(db_path, project_id) == []
@@ -178,7 +182,10 @@ def test_missing_confirm_local_write_fails_without_outputs(tmp_path, capsys) -> 
     assert project_status(db_path, project_id) == "script_generated"
 
 
-@pytest.mark.parametrize("missing_flag", ["--db-path", "--projects-root", "--project-id"])
+@pytest.mark.parametrize(
+    "missing_flag",
+    ["--db-path", "--projects-root", "--project-id"],
+)
 def test_required_generate_kdenlive_args_are_enforced(
     tmp_path,
     capsys,

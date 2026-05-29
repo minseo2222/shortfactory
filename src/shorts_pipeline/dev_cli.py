@@ -11,7 +11,11 @@ from pathlib import Path
 
 from shorts_pipeline.config import KST
 from shorts_pipeline.inspect import inspect_project
-from shorts_pipeline.models import FKdenliveManifest, ProjectInspectionResult, SmokeRunResult
+from shorts_pipeline.models import (
+    FKdenliveManifest,
+    ProjectInspectionResult,
+    SmokeRunResult,
+)
 
 SUCCESS = 0
 RUNTIME_ERROR = 1
@@ -32,7 +36,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "smoke",
         help="Run the local A -> B -> C -> D -> E smoke pipeline.",
     )
-    smoke.add_argument("--db-path", required=True, help="SQLite DB path for the smoke run.")
+    smoke.add_argument(
+        "--db-path",
+        required=True,
+        help="SQLite DB path for the smoke run.",
+    )
     smoke.add_argument(
         "--projects-root",
         required=True,
@@ -57,7 +65,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "inspect",
         help="Read-only inspection of one existing local project.",
     )
-    inspect_parser.add_argument("--db-path", required=True, help="Existing SQLite DB path.")
+    inspect_parser.add_argument(
+        "--db-path",
+        required=True,
+        help="Existing SQLite DB path.",
+    )
     inspect_parser.add_argument(
         "--projects-root",
         required=True,
@@ -89,7 +101,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "generate-kdenlive",
         help="Generate local Phase F Kdenlive skeleton artifacts for one existing project.",
     )
-    kdenlive_parser.add_argument("--db-path", required=True, help="Existing SQLite DB path.")
+    kdenlive_parser.add_argument(
+        "--db-path",
+        required=True,
+        help="Existing SQLite DB path.",
+    )
     kdenlive_parser.add_argument(
         "--projects-root",
         required=True,
