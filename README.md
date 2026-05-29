@@ -94,6 +94,23 @@ python -m shorts_pipeline.dev_cli inspect \
 The inspect command is read-only. It does not run smoke, call fake or real
 providers, render, upload, or mutate Kdenlive XML.
 
+## Dev Kdenlive Skeleton CLI
+
+Generate local F editing handoff artifacts for an existing `script_generated`
+project:
+
+```bash
+shorts-pipeline-dev generate-kdenlive \
+  --db-path ./.local/shorts_pipeline.sqlite3 \
+  --projects-root ./.local/projects \
+  --project-id PRJ_YYYYMMDD_0001 \
+  --confirm-local-write
+```
+
+This writes `project.kdenlive`, `f_kdenlive_manifest.json`, and
+`notes/manual_kdenlive_editing.md`. It does not render, run Kdenlive or melt,
+generate TTS, upload, call providers, or trust external `.kdenlive` files.
+
 ## CI
 
 GitHub Actions runs the local test suite and lint checks on `main`, `codex/**`

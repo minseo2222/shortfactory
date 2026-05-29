@@ -127,6 +127,9 @@ Done when:
   concise human-readable summary.
 - The read-only dev inspect CLI can report project status events, artifact rows,
   file existence, hash matches, and strict artifact problems without mutation.
+- The dev Kdenlive CLI can generate Phase 6/F local editing handoff artifacts
+  for an existing `script_generated` project with explicit
+  `--confirm-local-write`.
 - The protected-main baseline audit documents the current modules, contracts,
   DB tables, state transitions, CLI surface, CI, security boundaries, and gaps.
 - F generation writes `project.kdenlive`, `f_kdenlive_manifest.json`, and

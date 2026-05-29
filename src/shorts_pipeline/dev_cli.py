@@ -11,7 +11,11 @@ from pathlib import Path
 
 from shorts_pipeline.config import KST
 from shorts_pipeline.inspect import inspect_project
-from shorts_pipeline.models import ProjectInspectionResult, SmokeRunResult
+from shorts_pipeline.models import (
+    FKdenliveManifest,
+    ProjectInspectionResult,
+    SmokeRunResult,
+)
 
 SUCCESS = 0
 RUNTIME_ERROR = 1
@@ -32,7 +36,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "smoke",
         help="Run the local A -> B -> C -> D -> E smoke pipeline.",
     )
-    smoke.add_argument("--db-path", required=True, help="SQLite DB path for the smoke run.")
+    smoke.add_argument(
+        "--db-path",
+        required=True,
+        help="SQLite DB path for the smoke run.",
+    )
     smoke.add_argument(
         "--projects-root",
         required=True,
@@ -57,7 +65,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "inspect",
         help="Read-only inspection of one existing local project.",
     )
-    inspect_parser.add_argument("--db-path", required=True, help="Existing SQLite DB path.")
+    inspect_parser.add_argument(
+        "--db-path",
+        required=True,
+        help="Existing SQLite DB path.",
+    )
     inspect_parser.add_argument(
         "--projects-root",
         required=True,
@@ -83,6 +95,39 @@ def _build_parser() -> argparse.ArgumentParser:
         "--strict",
         action="store_true",
         help="Exit non-zero if artifact verification reports any problem.",
+    )
+
+    kdenlive_parser = subparsers.add_parser(
+        "generate-kdenlive",
+        help="Generate local Phase F Kdenlive skeleton artifacts for one existing project.",
+    )
+    kdenlive_parser.add_argument(
+        "--db-path",
+        required=True,
+        help="Existing SQLite DB path.",
+    )
+    kdenlive_parser.add_argument(
+        "--projects-root",
+        required=True,
+        help="Existing projects root directory.",
+    )
+    kdenlive_parser.add_argument(
+        "--project-id",
+        required=True,
+        help="Project ID in script_generated status.",
+    )
+    kdenlive_parser.add_argument(
+        "--confirm-local-write",
+        action="store_true",
+        help=(
+            "Required explicit confirmation that project.kdenlive and F artifacts "
+            "will be written under the existing project folder."
+        ),
+    )
+    kdenlive_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print only one Kdenlive skeleton summary JSON object to stdout.",
     )
     return parser
 
@@ -128,6 +173,39 @@ def _print_human_inspection(result: ProjectInspectionResult) -> None:
         print(f"{artifact.artifact_type} | {artifact.relative_path} | {exists} | {digest}")
 
 
+def _kdenlive_summary_json(result: FKdenliveManifest) -> dict[str, object]:
+    return {
+        "schema_version": result.schema_version,
+        "project_id": result.project_id,
+        "kdenlive_project_path": result.kdenlive_project_path,
+        "total_duration_sec": result.total_duration_sec,
+        "total_frames": result.total_frames,
+        "scene_count": len(result.scenes),
+        "external_template_used": result.external_template_used,
+        "rendering_performed": result.rendering_performed,
+    }
+
+
+def _print_human_kdenlive_result(result: FKdenliveManifest) -> None:
+    print("Kdenlive skeleton generated (local/dev-only)")
+    print(f"Project ID: {result.project_id}")
+    print(f"Kdenlive project: {result.kdenlive_project_path}")
+    print("Manifest: f_kdenlive_manifest.json")
+    print("Manual guide: notes/manual_kdenlive_editing.md")
+    print(f"Scenes: {len(result.scenes)}")
+    print(f"Rendering performed: {str(result.rendering_performed).lower()}")
+
+
+def _require_existing_file(path: Path, label: str) -> None:
+    if not path.is_file():
+        raise CliConfigurationError(f"{label} does not exist: {path}")
+
+
+def _require_existing_directory(path: Path, label: str) -> None:
+    if not path.is_dir():
+        raise CliConfigurationError(f"{label} does not exist: {path}")
+
+
 def _run_smoke_command(args: argparse.Namespace) -> int:
     if not args.use_fake_providers:
         raise CliConfigurationError("--use-fake-providers is required for dev smoke CLI")
@@ -150,6 +228,32 @@ def _run_smoke_command(args: argparse.Namespace) -> int:
         print(json.dumps(result.model_dump(mode="json"), indent=2, ensure_ascii=False))
     else:
         _print_human_result(result)
+    return SUCCESS
+
+
+def _run_generate_kdenlive_command(args: argparse.Namespace) -> int:
+    if not args.confirm_local_write:
+        raise CliConfigurationError(
+            "--confirm-local-write is required because this command writes "
+            "project.kdenlive and F artifacts"
+        )
+
+    from shorts_pipeline.f_service import generate_f_kdenlive_project
+
+    db_path = _resolve_cli_path(args.db_path)
+    projects_root = _resolve_cli_path(args.projects_root)
+    _require_existing_file(db_path, "database file")
+    _require_existing_directory(projects_root, "projects root")
+
+    result = generate_f_kdenlive_project(
+        args.project_id,
+        db_path=db_path,
+        projects_root=projects_root,
+    )
+    if args.json:
+        print(json.dumps(_kdenlive_summary_json(result), indent=2, ensure_ascii=False))
+    else:
+        _print_human_kdenlive_result(result)
     return SUCCESS
 
 
@@ -192,6 +296,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_smoke_command(args)
         if args.command == "inspect":
             return _run_inspect_command(args)
+        if args.command == "generate-kdenlive":
+            return _run_generate_kdenlive_command(args)
         parser.error(f"unknown command: {args.command}")
         return CONFIG_ERROR
     except CliConfigurationError as exc:

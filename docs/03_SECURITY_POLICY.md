@@ -126,6 +126,14 @@ must not create or modify DB rows, must not write files, and must not call the
 smoke pipeline or provider code. Stored artifact paths are untrusted input and
 must be validated before any file existence or SHA-256 check.
 
+## Dev Kdenlive CLI Safety
+
+The dev Kdenlive CLI must require explicit `--confirm-local-write` before
+calling the Phase F generation service. It may write only the local F handoff
+artifacts under an existing project folder and must not render, run Kdenlive or
+melt, generate TTS/audio, upload, call providers, read API keys, or trust
+external `.kdenlive` files.
+
 ## CI Safety
 
 GitHub Actions CI must use only dev dependencies, not the optional LLM provider

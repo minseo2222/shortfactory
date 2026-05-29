@@ -82,6 +82,9 @@
 - Dev inspect CLI tests cover read-only project lookup, status-event output,
   artifact row output, file/hash verification, strict mode, missing DB/root,
   unknown project IDs, unsafe artifact paths, and clean JSON stdout.
+- Dev Kdenlive CLI tests cover explicit local-write confirmation, JSON and
+  human output, required arguments, unknown project IDs, wrong project status,
+  generated F artifact files, and clean JSON stdout.
 - Phase 6/F tests cover Kdenlive skeleton generation after A to E, D-confirmed
   image paths, timeline text overlays, manifest/XML validation, manual editing
   guide safety notes, artifact SHA-256 records, wrong status, missing inputs, D
