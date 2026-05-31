@@ -13,6 +13,7 @@ from shorts_pipeline.config import KST
 from shorts_pipeline.inspect import inspect_project
 from shorts_pipeline.models import (
     FKdenliveManifest,
+    ProjectFolderVerificationResult,
     ProjectInspectionResult,
     SmokeRunResult,
 )
@@ -137,6 +138,41 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print only one Kdenlive skeleton summary JSON object to stdout.",
     )
+
+    verify_parser = subparsers.add_parser(
+        "verify-project",
+        help="Read-only verification of one generated local project folder.",
+    )
+    verify_parser.add_argument(
+        "--db-path",
+        required=True,
+        help="Existing SQLite DB path.",
+    )
+    verify_parser.add_argument(
+        "--projects-root",
+        required=True,
+        help="Existing projects root directory.",
+    )
+    verify_parser.add_argument(
+        "--project-id",
+        required=True,
+        help="Project ID to verify.",
+    )
+    verify_parser.add_argument(
+        "--require-f",
+        action="store_true",
+        help="Require and validate Phase F Kdenlive handoff artifacts.",
+    )
+    verify_parser.add_argument(
+        "--no-verify-hashes",
+        action="store_true",
+        help="Skip DB artifact SHA-256 checks.",
+    )
+    verify_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print only the ProjectFolderVerificationResult JSON object to stdout.",
+    )
     return parser
 
 
@@ -210,6 +246,28 @@ def _print_human_kdenlive_result(result: FKdenliveManifest) -> None:
     print("Manual guide: notes/manual_kdenlive_editing.md")
     print(f"Scenes: {len(result.scenes)}")
     print(f"Rendering performed: {str(result.rendering_performed).lower()}")
+
+
+def _print_human_project_verification(result: ProjectFolderVerificationResult) -> None:
+    print("Project folder verification (read-only)")
+    print(f"Project ID: {result.project_id}")
+    print(f"Status: {result.project_status}")
+    print(f"A to E verified: {str(result.verified_a_to_e).lower()}")
+    print(f"F verified: {str(result.verified_f).lower()}")
+    print(f"Problems: {result.problem_count}")
+    if result.require_f:
+        print("Required F artifacts:")
+        print("- project.kdenlive")
+        print("- f_kdenlive_manifest.json")
+        print("- notes/manual_kdenlive_editing.md")
+    if result.problem_count:
+        print("Problem items:")
+        for item in result.items:
+            if item.problem is None and item.valid:
+                continue
+            relative_path = f" ({item.relative_path})" if item.relative_path else ""
+            problem = item.problem or "invalid"
+            print(f"- {item.name}{relative_path}: {problem}")
 
 
 def _require_existing_file(path: Path, label: str) -> None:
@@ -301,6 +359,25 @@ def _run_inspect_command(args: argparse.Namespace) -> int:
     return SUCCESS
 
 
+def _run_verify_project_command(args: argparse.Namespace) -> int:
+    from shorts_pipeline.project_verify import verify_generated_project_folder
+
+    db_path = _resolve_cli_path(args.db_path)
+    projects_root = _resolve_cli_path(args.projects_root)
+    result = verify_generated_project_folder(
+        db_path=db_path,
+        projects_root=projects_root,
+        project_id=args.project_id,
+        require_f=args.require_f,
+        verify_hashes=not args.no_verify_hashes,
+    )
+    if args.json:
+        print(json.dumps(result.model_dump(mode="json"), indent=2, ensure_ascii=False))
+    else:
+        _print_human_project_verification(result)
+    return SUCCESS if result.problem_count == 0 else RUNTIME_ERROR
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     try:
@@ -315,6 +392,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_inspect_command(args)
         if args.command == "generate-kdenlive":
             return _run_generate_kdenlive_command(args)
+        if args.command == "verify-project":
+            return _run_verify_project_command(args)
         parser.error(f"unknown command: {args.command}")
         return CONFIG_ERROR
     except CliConfigurationError as exc:

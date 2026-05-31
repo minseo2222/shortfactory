@@ -309,3 +309,29 @@ Each artifact inspection row includes the stored artifact type, relative path,
 optional SHA-256, path safety result, optional file existence result, optional
 hash-match result, and any verification error. Unsafe stored paths are reported
 without reading the referenced file.
+
+## ProjectFolderVerificationResult
+
+Schema version: `project_folder_verification.v2.1`
+
+Returned by the read-only dev project verifier. It is not written as a project
+artifact and must not create projects, run smoke, run generation services, or
+mutate DB rows/files.
+
+Fields:
+
+- `project_id`
+- `project_status`
+- `require_f`
+- `verified_a_to_e`
+- `verified_f`
+- `problem_count`
+- `items`
+- `warnings`
+
+Each verification item records a check name, optional relative path, kind,
+existence result, validity, whether the item was required, optional SHA-256
+match result, and a problem string. The verifier validates required A to E JSON
+contracts and assets, and validates F manifest/XML/artifact rows only when
+`require_f` is true. Stored DB artifact paths are untrusted and must be checked
+before file access.

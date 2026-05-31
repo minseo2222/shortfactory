@@ -275,6 +275,7 @@ def test_module_help_smoke_subcommand_is_available(capsys) -> None:
     captured = capsys.readouterr()
     assert exit_code == 0
     assert "smoke" in captured.out
+    assert "verify-project" in captured.out
 
 
 def test_smoke_help_includes_run_f_flag(capsys) -> None:

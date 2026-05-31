@@ -110,6 +110,24 @@ python -m shorts_pipeline.dev_cli inspect \
 The inspect command is read-only. It does not run smoke, call fake or real
 providers, render, upload, or mutate Kdenlive XML.
 
+## Dev Project Verifier
+
+Verify an existing generated project folder without mutating files or DB rows:
+
+```bash
+shorts-pipeline-dev verify-project \
+  --db-path ./.local/shorts_pipeline.sqlite3 \
+  --projects-root ./.local/projects \
+  --project-id PRJ_YYYYMMDD_0001 \
+  --require-f
+```
+
+This checks JSON contracts, image assets, artifact rows, hashes, and, with
+`--require-f`, `project.kdenlive`, `f_kdenlive_manifest.json`, and
+`notes/manual_kdenlive_editing.md`. It does not run smoke, generate artifacts,
+render, launch Kdenlive or melt, upload, call providers, use network, or trust
+external `.kdenlive` files.
+
 ## Dev Kdenlive Skeleton CLI
 
 Generate local F editing handoff artifacts for an existing `script_generated`

@@ -428,6 +428,31 @@ class ProjectInspectionResult(StrictModel):
     warnings: list[str] = Field(default_factory=list, max_length=50)
 
 
+class ProjectVerificationItem(StrictModel):
+    name: str = Field(min_length=1)
+    relative_path: str | None = None
+    kind: str = Field(min_length=1)
+    exists: bool | None = None
+    valid: bool
+    required: bool
+    sha256_matches: bool | None = None
+    problem: str | None = None
+
+
+class ProjectFolderVerificationResult(StrictModel):
+    schema_version: Literal["project_folder_verification.v2.1"] = (
+        "project_folder_verification.v2.1"
+    )
+    project_id: str = Field(pattern=r"^PRJ_\d{8}_\d{4}$")
+    project_status: str = Field(min_length=1)
+    require_f: bool
+    verified_a_to_e: bool
+    verified_f: bool
+    problem_count: int = Field(ge=0)
+    items: list[ProjectVerificationItem]
+    warnings: list[str] = Field(default_factory=list, max_length=50)
+
+
 def model_validate_json_dict(model: type[StrictModel], data: dict[str, Any]) -> StrictModel:
     """Validate a JSON-like dictionary against one of the strict contracts."""
     return model.model_validate(data)
