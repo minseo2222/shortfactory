@@ -81,7 +81,7 @@ restrictions: null
 - `src/shorts_pipeline/__init__.py` - package marker and version.
 - `src/shorts_pipeline/config.py` - KST time helper and environment-backed settings.
 - `src/shorts_pipeline/models.py` - strict Pydantic contracts for candidates, source, B, C, D,
-  E, smoke results, status events, and inspection results.
+  E, smoke results, status events, inspection results, and verification results.
 - `src/shorts_pipeline/db.py` - SQLite connections, schema initialization, read-only DB connection,
   status event insertion, and status event listing.
 - `src/shorts_pipeline/security.py` - safe relative path checks, root containment checks,
@@ -101,10 +101,12 @@ restrictions: null
   manifest/XML validation, manual guide writing, artifact persistence, and rollback.
 - `src/shorts_pipeline/smoke.py` - deterministic local A to E integration smoke runner
   with optional F handoff verification.
-- `src/shorts_pipeline/dev_cli.py` - dev-only `smoke`, read-only `inspect`, and
-  local-write `generate-kdenlive` CLI commands.
+- `src/shorts_pipeline/dev_cli.py` - dev-only `smoke`, read-only `inspect`,
+  read-only `verify-project`, and local-write `generate-kdenlive` CLI commands.
 - `src/shorts_pipeline/dev_fakes.py` - deterministic fake B and E providers for local smoke runs.
 - `src/shorts_pipeline/inspect.py` - read-only project inspection API.
+- `src/shorts_pipeline/project_verify.py` - read-only generated project folder verifier for
+  A to E and optional F artifact consistency checks.
 - `src/shorts_pipeline/llm/__init__.py` - LLM helper package marker.
 - `src/shorts_pipeline/llm/b_provider.py` - B provider protocol only.
 - `src/shorts_pipeline/llm/e_provider.py` - E provider protocol only.
@@ -142,6 +144,11 @@ restrictions: null
   artifact problems, hash mismatch, unsafe paths, strict mode, and verification skip flags.
 - `tests/test_dev_cli_kdenlive.py` - dev Kdenlive CLI confirmation gate, JSON/human output,
   required args, unknown project, wrong status, and no-rendering flags.
+- `tests/test_project_verify.py` - read-only project verifier coverage for A to E and
+  required-F happy paths, missing artifacts, hash mismatches, unsafe artifact rows, and
+  non-mutation guarantees.
+- `tests/test_dev_cli_verify_project.py` - dev verifier CLI JSON/human output, required
+  arguments, problem exit codes, no-hash mode, unknown project IDs, and help surface.
 - `tests/test_db.py` - SQLite initialization and status CHECK constraint coverage.
 - `tests/test_security.py` - path traversal, absolute path, external URL, media extension,
   and XML escaping coverage.
@@ -165,7 +172,7 @@ manual candidate
 -> E script/title
 -> F Kdenlive handoff
 -> smoke runner
--> dev CLI / inspect CLI / Kdenlive CLI
+-> dev CLI / inspect CLI / verify CLI / Kdenlive CLI
 ```
 
 The runtime services are intentionally small and phase-scoped:
@@ -180,6 +187,8 @@ The runtime services are intentionally small and phase-scoped:
 - Smoke composes the local A to E path with deterministic fake providers, and can
   explicitly opt into F handoff generation and verification.
 - Inspect reads existing DB rows and artifact files without mutation.
+- Verify-project reads existing DB rows and artifact files without mutation, validating
+  JSON contracts, local assets, DB artifact rows, hashes, and optional F XML.
 
 ## Data Contracts Summary
 
@@ -207,6 +216,8 @@ The runtime services are intentionally small and phase-scoped:
   as a project artifact.
 - `ProjectInspectionResult`, `ProjectInspectionSummary`, and `ArtifactInspectionRow` -
   read-only inspection output, not persisted as a project artifact.
+- `ProjectFolderVerificationResult` and `ProjectVerificationItem` - read-only project folder
+  verification output, not persisted as a project artifact.
 
 All Pydantic models use strict extra-field rejection through `StrictModel` or equivalent model
 configuration.
@@ -214,7 +225,8 @@ configuration.
 ## Database Schema Summary
 
 `src/shorts_pipeline/db.py` creates and migrates the local SQLite schema. Connections enable
-foreign keys and request WAL mode for write paths. Read-only inspection uses `mode=ro`.
+foreign keys and request WAL mode for write paths. Read-only inspection and verification use
+`mode=ro`.
 
 - `projects` - one row per selected project; includes ID, project directory, source URL/title,
   community, status, created timestamp, updated timestamp, and path-safety CHECK constraints.
@@ -386,6 +398,16 @@ archival from `completed`.
 - Safety behavior: validates stored artifact paths before file access; reports missing files,
   unsafe paths, and hash mismatches without repairing anything.
 
+### `python -m shorts_pipeline.dev_cli verify-project`
+
+- Purpose: verify one existing generated project folder and its DB artifact rows.
+- Required flags: `--db-path`, `--projects-root`, `--project-id`.
+- Optional flags: `--require-f`, `--no-verify-hashes`, `--json`.
+- Writes: nothing. It opens the DB in read-only mode and does not initialize or migrate.
+- Safety behavior: validates A to E JSON contracts and assets, and with `--require-f`
+  validates F manifest/XML/artifact rows; it does not run smoke, run generation services,
+  render, upload, call providers, use network, or trust external `.kdenlive` files.
+
 ### `python -m shorts_pipeline.dev_cli generate-kdenlive`
 
 - Purpose: generate Phase F local Kdenlive handoff artifacts for an existing
@@ -429,6 +451,10 @@ tests. The pre-audit `main` suite had 114 tests.
 - `tests/test_dev_inspect_cli.py` - inspect CLI behavior and read-only guarantees.
 - `tests/test_dev_cli_kdenlive.py` - Kdenlive CLI confirmation gate, JSON/human output,
   required args, unknown project, wrong status, and no-rendering flags.
+- `tests/test_project_verify.py` - project verifier behavior, read-only guarantees,
+  A to E/F checks, missing artifacts, unsafe artifact rows, and hash mismatches.
+- `tests/test_dev_cli_verify_project.py` - verify-project CLI JSON/human output,
+  required arguments, problem exit codes, no-hash mode, and unknown project IDs.
 - `tests/test_db.py` - schema and status constraint.
 - `tests/test_security.py` - path and XML helpers.
 - `tests/test_state_machine.py` - transition rules.
@@ -450,7 +476,7 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
   allowed in artifacts.
 - Source artifacts store only minimal metadata and explicit storage policy flags.
 - Generated artifact paths are safe relative paths and are checked against project-root containment.
-- Artifact rows store SHA-256 hashes; smoke and inspect verify them.
+- Artifact rows store SHA-256 hashes; smoke, inspect, and verify-project verify them.
 - D image manifest blocks E readiness for unconfirmed rights, personal information, original
   captures, unsafe paths, missing files, dimension/format problems, face-rights gaps, community
   logos, and hash mismatches.
@@ -465,6 +491,8 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
   melt, rendering, TTS, upload, providers, or network calls.
 - The dev Kdenlive CLI requires explicit `--confirm-local-write` before invoking the F service.
 - Dev inspect is read-only and does not call smoke, providers, or DB initialization.
+- Dev verify-project is read-only and does not call smoke, generation services, providers,
+  DB initialization, rendering tools, upload, or network.
 - Text hygiene tests block CRLF/CR-only line endings and hidden/bidirectional Unicode controls
   in selected tracked text files.
 

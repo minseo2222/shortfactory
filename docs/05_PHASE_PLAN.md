@@ -127,6 +127,9 @@ Done when:
   concise human-readable summary.
 - The read-only dev inspect CLI can report project status events, artifact rows,
   file existence, hash matches, and strict artifact problems without mutation.
+- The read-only dev project verifier can validate an existing A to E or A to F
+  project folder, JSON contracts, local PNG assets, DB artifact rows, hashes,
+  and F XML without mutation.
 - The dev Kdenlive CLI can generate Phase 6/F local editing handoff artifacts
   for an existing `script_generated` project with explicit
   `--confirm-local-write`.

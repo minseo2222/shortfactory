@@ -126,6 +126,15 @@ must not create or modify DB rows, must not write files, and must not call the
 smoke pipeline or provider code. Stored artifact paths are untrusted input and
 must be validated before any file existence or SHA-256 check.
 
+## Dev Project Verifier Safety
+
+The dev project verifier CLI is read-only. It must open an existing DB in
+read-only mode, validate the existing project folder and artifact rows, and
+report problems without repairing them. It must not initialize or migrate the
+DB, write files, run smoke, run generation services, launch Kdenlive or melt,
+render, upload, call providers, use network, or trust external `.kdenlive`
+files.
+
 ## Dev Kdenlive CLI Safety
 
 The dev Kdenlive CLI must require explicit `--confirm-local-write` before

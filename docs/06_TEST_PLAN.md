@@ -82,6 +82,10 @@
 - Dev inspect CLI tests cover read-only project lookup, status-event output,
   artifact row output, file/hash verification, strict mode, missing DB/root,
   unknown project IDs, unsafe artifact paths, and clean JSON stdout.
+- Dev project verifier tests cover read-only A to E and required-F verification,
+  JSON contract checks, F XML validation, artifact row and SHA-256 checks,
+  missing artifacts, unsafe artifact rows, hash mismatches, CLI JSON/human
+  output, and non-mutating failure reports.
 - Dev Kdenlive CLI tests cover explicit local-write confirmation, JSON and
   human output, required arguments, unknown project IDs, wrong project status,
   generated F artifact files, and clean JSON stdout.
