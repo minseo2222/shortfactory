@@ -96,14 +96,20 @@
   and an obvious-secret guard on `main`, `codex/**`, and PRs to `main`.
 - Baseline audit doc tests check required sections and key governance, state,
   CI, inventory, and non-goal claims.
-
-Future phases:
-
-- Multi-sample smoke runs.
+- Multi-sample smoke tests run twelve distinct synthetic candidates with varied
+  valid scene plans (4-6 scenes, different styles and durations) through the full
+  A->F path, asserting `script_generated` status, timeline/narration scene-count
+  match, a parseable 1080x1920 30fps `project.kdenlive`, and that every timeline
+  and producer media resource exists on disk (no missing media).
 
 ## Manual Smoke Tests
 
-Future phases:
+### Kdenlive open
+
+The automatable parts of the Kdenlive handoff (XML parse, 1080x1920 30fps
+profile, and producer/timeline resource existence) are enforced by
+`tests/test_multisample_smoke.py` and `tests/test_f_kdenlive_project.py`. The
+following GUI steps still require a manual Kdenlive install and run:
 
 - Open `project.kdenlive` in Kdenlive.
 - Confirm no missing media.
