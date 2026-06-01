@@ -7,6 +7,7 @@
   -> C. Project compiler
   -> D. Human image insertion
   -> E. Narration/title generator
+  -> F. Self-generated Kdenlive skeleton
   -> SQLite + local project folder
 ```
 
@@ -64,7 +65,6 @@ Output:
 - `assets/placeholders/slot_XXX_placeholder.png`
 - `assets/user_images/slot_XXX.png`
 - `assets/text_overlays/sXX_text.png`
-- `project.kdenlive`
 - `notes/replace_images.md`
 
 Rules:
@@ -73,6 +73,7 @@ Rules:
 - C computes `start_sec` by accumulating scene durations.
 - Initial `slot_XXX.png` files may be placeholder copies.
 - Text overlays are PNG files.
+- C does not generate `project.kdenlive`; that is produced later by F.
 
 ## D. Image Insertion
 
@@ -111,6 +112,31 @@ Rules:
 - Titles must not invent facts.
 - Recommended title must be one title candidate.
 
+## F. Kdenlive Skeleton
+
+F is a self-generating compiler, not a renderer.
+
+Input:
+
+- `source.json`
+- `timeline.json`
+- `d_image_manifest.json`
+- `e_script.json`
+
+Output:
+
+- `project.kdenlive`
+- `f_kdenlive_manifest.json`
+- `notes/manual_kdenlive_editing.md`
+
+Rules:
+
+- F requires `script_generated` status and keeps the project status unchanged.
+- The XML is self-generated from validated C/D/E artifacts only.
+- External `.kdenlive` files are never parsed, copied, trusted, or mutated.
+- F does not render, upload, generate TTS, call providers, or run Kdenlive/melt.
+- All resource paths are safe relative paths under the project.
+
 ## Local Smoke Path
 
 The backend services have a deterministic local A -> B -> C -> D -> E smoke
@@ -129,11 +155,14 @@ projects/
     d_image_manifest.json
     e_script.json
     project.kdenlive
+    f_kdenlive_manifest.json
     assets/
       placeholders/
       user_images/
       text_overlays/
     notes/
+      replace_images.md
+      manual_kdenlive_editing.md
     exports/
     logs/
 ```
