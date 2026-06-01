@@ -134,6 +134,9 @@ restrictions: null
   retry, validators, persistence, status transition, and rollback.
 - `tests/test_f_kdenlive_project.py` - Phase F Kdenlive skeleton generation, XML/manifest
   validation, artifact hashes, safety blockers, status preservation, and rollback.
+- `tests/test_redteam_content_safety.py` - red-team coverage for the docs/06 attack
+  categories: real-name/nickname inference, crime assertion, fabricated numbers, direct
+  source/comment quotation, original-capture reuse, and mockery of individuals.
 - `tests/test_integration_smoke.py` - deterministic A to E smoke path, artifacts, DB rows,
   status history, and negative smoke behavior.
 - `tests/test_dev_cli.py` - dev smoke CLI JSON/human output, fake-provider gate, fixed clock,
@@ -329,8 +332,9 @@ archival from `completed`.
 - Status transition: `images_inserted -> script_generated`.
 - Validation gate: D readiness helper, safe E generation context, Pydantic validation, narration
   scene order, fact-basis connection, speakability heuristic, recommended-title membership,
-  title uniqueness, numeric claim guard, hard overclaim guard, identity guard, forbidden-claims
-  categories, direct-copy check, raw-source term guard, absolute path guard, and metadata guard.
+  title uniqueness, numeric claim guard, hard overclaim guard, identity guard, mockery/hate
+  guard, forbidden-claims categories, direct-copy check, raw-source term guard, absolute path
+  guard, and metadata guard.
 - Explicit non-goals: no real provider, no network, no TTS, no voice synthesis, no rendering,
   and no upload.
 
@@ -423,6 +427,8 @@ tests. The pre-audit `main` suite had 114 tests.
   text overlay resources, deterministic frames, manual guide notes, blocked statuses,
   missing/invalid inputs, unsafe paths, forbidden XML terms, no external template use, and
   rollback.
+- `tests/test_redteam_content_safety.py` - adversarial B/E payloads for each docs/06
+  red-team category, asserting deterministic guard rejection without provider calls.
 - `tests/test_integration_smoke.py` - full A to E smoke path, optional F smoke path,
   artifact checks, and negative smoke behavior.
 - `tests/test_dev_cli.py` - smoke CLI behavior, including optional `--run-f`.
