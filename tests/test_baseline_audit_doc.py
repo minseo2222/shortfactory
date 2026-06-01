@@ -45,7 +45,7 @@ def test_baseline_audit_doc_has_required_sections_and_claims() -> None:
         "-> script_generated"
     ) in text
     assert "pytest and ruff" in text
-    assert "No real LLM provider adapter exists yet" in text
+    assert "Real LLM provider adapters are opt-in and disabled by default" in text
     assert "No production Kdenlive project generation exists yet" in text
     assert (
         "No rendering, TTS, voice synthesis, BGM generation, upload, or YouTube workflow exists"
