@@ -109,6 +109,9 @@ restrictions: null
 - `src/shorts_pipeline/llm/b_provider.py` - B provider protocol only.
 - `src/shorts_pipeline/llm/e_provider.py` - E provider protocol only.
 - `src/shorts_pipeline/llm/validators.py` - LLM-shaped artifact validation helpers and D readiness helper.
+- `src/shorts_pipeline/llm/real_providers.py` - optional, opt-in real LLM adapters
+  (OpenAI/Anthropic/Gemini) loaded dynamically via importlib; disabled by default and never
+  called by tests, CI, or the default pipeline path.
 - `src/shorts_pipeline/projectgen/__init__.py` - project generation helper package marker.
 - `src/shorts_pipeline/projectgen/timeline.py` - timeline start-time assignment and B-to-timeline build helper.
 - `src/shorts_pipeline/projectgen/placeholder.py` - local Pillow placeholder PNG generation.
@@ -116,6 +119,11 @@ restrictions: null
 - `src/shorts_pipeline/projectgen/replace_images.py` - local replacement instruction Markdown generation.
 - `src/shorts_pipeline/projectgen/kdenlive.py` - standard-library XML builder for the
   self-generated F Kdenlive/MLT skeleton.
+- `src/shorts_pipeline/ui/__init__.py` - local UI package marker.
+- `src/shorts_pipeline/ui/controller.py` - Streamlit-free orchestration layer composing the
+  A->F phase services, provider selection (default fake, opt-in real), and read helpers.
+- `src/shorts_pipeline/ui/app.py` - thin Streamlit entry point rendering the local A->F flow;
+  calls only the controller and performs no network egress.
 
 ### Tests
 
@@ -152,12 +160,19 @@ restrictions: null
 - `tests/test_timeline.py` - start-time accumulation and scene order coverage.
 - `tests/test_ci_workflow.py` - CI workflow trigger, dependency, action-version, pytest, Ruff,
   network/provider guard, and secret guard checks.
+- `tests/test_real_llm_providers.py` - offline unit tests for the optional real LLM adapters:
+  JSON parsing, prompt construction, opt-in resolver, SDK/key error paths, no-literal-import
+  guard discipline, and service drop-in integration with a fake completion client.
+- `tests/test_ui_controller.py` - Streamlit-free UI controller coverage: full A->F path,
+  stage-by-stage status progression, provider selection, status events, and D payload builder.
 - `tests/test_text_file_hygiene.py` - LF line-ending and hidden Unicode control checks for
   selected repo text files.
 
 ## Runtime Architecture Summary
 
-The current local backend is a file-and-SQLite pipeline. It has no product UI yet.
+The current local backend is a file-and-SQLite pipeline. A thin local Streamlit UI
+(`src/shorts_pipeline/ui/`) drives the A->F flow through a Streamlit-free controller; it is
+optional (the `ui` extra) and performs no network egress.
 
 ```text
 manual candidate
@@ -440,6 +455,10 @@ tests. The pre-audit `main` suite had 114 tests.
 - `tests/test_state_machine.py` - transition rules.
 - `tests/test_timeline.py` - start-time helper.
 - `tests/test_ci_workflow.py` - CI workflow contract.
+- `tests/test_real_llm_providers.py` - optional real LLM adapter behavior, opt-in gating,
+  error paths, and import-guard discipline, all without real SDKs or network.
+- `tests/test_ui_controller.py` - UI orchestration controller: full A->F path, status
+  progression, provider selection, and D payload construction without Streamlit.
 - `tests/test_baseline_audit_doc.py` - baseline audit document structure and key claims.
 - `tests/test_text_file_hygiene.py` - LF line-ending and hidden/bidirectional Unicode control
   checks for selected repository text files.
@@ -448,8 +467,12 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Security Boundary Summary
 
-- No real LLM provider calls are implemented.
-- B and E use injected provider protocols and deterministic fake providers in tests/dev smoke only.
+- Real LLM provider adapters are opt-in and disabled by default; no real provider call is made
+  by tests, CI, or the default pipeline path.
+- Optional adapters load their SDK dynamically via importlib (no literal SDK import statements),
+  read API keys only from the environment at client-construction time, and never store keys in
+  artifacts, the DB, logs, or provider object attributes.
+- B and E default to injected provider protocols and deterministic fake providers in tests/dev smoke.
 - CI guards against direct imports of real provider/network clients in `src` and `tests`.
 - No automated crawling or scraping is implemented.
 - No full source post, full comment, raw HTML, source screenshot, API key, or secret storage is
@@ -490,7 +513,8 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Known Risks and Gaps
 
-- No real LLM provider adapter exists yet.
+- Real LLM provider adapters are opt-in and disabled by default; they have no real-SDK or
+  network coverage in CI, so provider output quality is unverified.
 - No Streamlit UI exists yet.
 - No production Kdenlive project generation exists yet; Phase 6/F is a local
   self-generated editing skeleton only and still requires manual Kdenlive verification.

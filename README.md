@@ -64,6 +64,22 @@ The Kdenlive file is self-generated from validated `timeline.json`,
 external `.kdenlive` files, render video, run Kdenlive or melt, generate TTS, or
 upload anything. The project status remains `script_generated`.
 
+## Local UI
+
+A thin local Streamlit UI drives the manual A through F flow:
+
+```bash
+pip install -e ".[ui]"
+python -m streamlit run src/shorts_pipeline/ui/app.py
+```
+
+The UI calls only the existing phase services through a Streamlit-free
+controller (`src/shorts_pipeline/ui/controller.py`). It performs no network
+egress: B and E use the deterministic fake providers unless the explicit
+real-LLM opt-in (`SHORTS_PIPELINE_ENABLE_REAL_LLM` plus
+`SHORTS_PIPELINE_LLM_BACKEND`) is configured. It does not render video, run TTS,
+upload, or trust external `.kdenlive` files.
+
 ## Dev Smoke CLI
 
 Run the local backend smoke path with explicit fake providers:
