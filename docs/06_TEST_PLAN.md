@@ -96,12 +96,29 @@
   and an obvious-secret guard on `main`, `codex/**`, and PRs to `main`.
 - Baseline audit doc tests check required sections and key governance, state,
   CI, inventory, and non-goal claims.
+- UI controller tests cover the full A->F path, stage-by-stage status
+  progression, default-fake/opt-in-real provider selection, status events, and
+  D payload construction without importing Streamlit.
 
 Future phases:
 
 - Multi-sample smoke runs.
 
 ## Manual Smoke Tests
+
+### Local UI (Streamlit)
+
+Run `python -m streamlit run src/shorts_pipeline/ui/app.py`, then:
+
+- Set a local working directory in the sidebar; confirm provider mode shows
+  `fake` with no opt-in configured.
+- Create a project from the A candidate form; confirm status `candidate_selected`.
+- Step through B, C, the D rights-confirmation form, E, and F; confirm the
+  sidebar status history advances `candidate_selected -> ... -> script_generated`.
+- Confirm the F screen prints local `project.kdenlive` and handoff-note paths.
+- Confirm no network egress occurs (offline run succeeds).
+
+### Kdenlive open
 
 Future phases:
 

@@ -119,6 +119,11 @@ restrictions: null
 - `src/shorts_pipeline/projectgen/replace_images.py` - local replacement instruction Markdown generation.
 - `src/shorts_pipeline/projectgen/kdenlive.py` - standard-library XML builder for the
   self-generated F Kdenlive/MLT skeleton.
+- `src/shorts_pipeline/ui/__init__.py` - local UI package marker.
+- `src/shorts_pipeline/ui/controller.py` - Streamlit-free orchestration layer composing the
+  A->F phase services, provider selection (default fake, opt-in real), and read helpers.
+- `src/shorts_pipeline/ui/app.py` - thin Streamlit entry point rendering the local A->F flow;
+  calls only the controller and performs no network egress.
 
 ### Tests
 
@@ -155,12 +160,16 @@ restrictions: null
 - `tests/test_real_llm_providers.py` - offline unit tests for the optional real LLM adapters:
   JSON parsing, prompt construction, opt-in resolver, SDK/key error paths, no-literal-import
   guard discipline, and service drop-in integration with a fake completion client.
+- `tests/test_ui_controller.py` - Streamlit-free UI controller coverage: full A->F path,
+  stage-by-stage status progression, provider selection, status events, and D payload builder.
 - `tests/test_text_file_hygiene.py` - LF line-ending and hidden Unicode control checks for
   selected repo text files.
 
 ## Runtime Architecture Summary
 
-The current local backend is a file-and-SQLite pipeline. It has no product UI yet.
+The current local backend is a file-and-SQLite pipeline. A thin local Streamlit UI
+(`src/shorts_pipeline/ui/`) drives the A->F flow through a Streamlit-free controller; it is
+optional (the `ui` extra) and performs no network egress.
 
 ```text
 manual candidate
@@ -442,6 +451,8 @@ tests. The pre-audit `main` suite had 114 tests.
 - `tests/test_ci_workflow.py` - CI workflow contract.
 - `tests/test_real_llm_providers.py` - optional real LLM adapter behavior, opt-in gating,
   error paths, and import-guard discipline, all without real SDKs or network.
+- `tests/test_ui_controller.py` - UI orchestration controller: full A->F path, status
+  progression, provider selection, and D payload construction without Streamlit.
 - `tests/test_baseline_audit_doc.py` - baseline audit document structure and key claims.
 - `tests/test_text_file_hygiene.py` - LF line-ending and hidden/bidirectional Unicode control
   checks for selected repository text files.
