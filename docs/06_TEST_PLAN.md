@@ -99,10 +99,11 @@
 - UI controller tests cover the full A->F path, stage-by-stage status
   progression, default-fake/opt-in-real provider selection, status events, and
   D payload construction without importing Streamlit.
-
-Future phases:
-
-- Multi-sample smoke runs.
+- Multi-sample smoke tests run twelve distinct synthetic candidates with varied
+  valid scene plans (4-6 scenes, different styles and durations) through the full
+  A->F path, asserting `script_generated` status, timeline/narration scene-count
+  match, a parseable 1080x1920 30fps `project.kdenlive`, and that every timeline
+  and producer media resource exists on disk (no missing media).
 
 ## Manual Smoke Tests
 
@@ -120,7 +121,10 @@ Run `python -m streamlit run src/shorts_pipeline/ui/app.py`, then:
 
 ### Kdenlive open
 
-Future phases:
+The automatable parts of the Kdenlive handoff (XML parse, 1080x1920 30fps
+profile, and producer/timeline resource existence) are enforced by
+`tests/test_multisample_smoke.py` and `tests/test_f_kdenlive_project.py`. The
+following GUI steps still require a manual Kdenlive install and run:
 
 - Open `project.kdenlive` in Kdenlive.
 - Confirm no missing media.

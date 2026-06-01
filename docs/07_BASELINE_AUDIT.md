@@ -147,6 +147,8 @@ restrictions: null
   source/comment quotation, original-capture reuse, and mockery of individuals.
 - `tests/test_integration_smoke.py` - deterministic A to E smoke path, artifacts, DB rows,
   status history, and negative smoke behavior.
+- `tests/test_multisample_smoke.py` - twelve distinct varied-scene-plan samples through the
+  full A->F path, verifying status, scene-count match, Kdenlive profile, and no missing media.
 - `tests/test_dev_cli.py` - dev smoke CLI JSON/human output, fake-provider gate, fixed clock,
   required args, directory creation, and clean stdout.
 - `tests/test_dev_inspect_cli.py` - read-only inspect CLI, mutation checks, missing DB/root,
@@ -446,6 +448,8 @@ tests. The pre-audit `main` suite had 114 tests.
   red-team category, asserting deterministic guard rejection without provider calls.
 - `tests/test_integration_smoke.py` - full A to E smoke path, optional F smoke path,
   artifact checks, and negative smoke behavior.
+- `tests/test_multisample_smoke.py` - multi-sample A->F coverage across varied scene plans,
+  asserting status, Kdenlive profile, and media-resource existence.
 - `tests/test_dev_cli.py` - smoke CLI behavior, including optional `--run-f`.
 - `tests/test_dev_inspect_cli.py` - inspect CLI behavior and read-only guarantees.
 - `tests/test_dev_cli_kdenlive.py` - Kdenlive CLI confirmation gate, JSON/human output,
