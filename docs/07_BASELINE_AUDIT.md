@@ -53,6 +53,8 @@ restrictions: null
 - `gpt_pro_first_response_a_to_f.md` - historical GPT Pro review/prompt context.
 - `pyproject.toml` - package metadata, runtime dependencies, optional extras, console script,
   pytest configuration, and Ruff configuration.
+- `requirements.lock.txt` - version pins of the verified core + dev dependency closure;
+  optional `ui`/`llm` extras are intentionally unpinned.
 
 ### GitHub Workflow
 
@@ -519,7 +521,11 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 - Real LLM provider adapters are opt-in and disabled by default; they have no real-SDK or
   network coverage in CI, so provider output quality is unverified.
-- No Streamlit UI exists yet.
+- A local Streamlit UI now drives A->F, but the Streamlit rendering layer itself is verified by
+  a manual checklist rather than automated UI tests (the controller is unit tested).
+- `python-dotenv` is declared in `pyproject.toml` but is not imported by any module (config
+  reads `os.environ` directly) and is not installed in the verified environment; consider
+  wiring `.env` loading or removing the dependency.
 - No production Kdenlive project generation exists yet; Phase 6/F is a local
   self-generated editing skeleton only and still requires manual Kdenlive verification.
 - C currently generates canonical local files and PNG assets; F now generates a local
@@ -535,8 +541,10 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Recommended Next Implementation Slice
 
-Add a manual Kdenlive-open verification checklist for generated `project.kdenlive` files that
-still avoids rendering, upload, TTS, and external `.kdenlive` trust.
+The local A->F product scope is implemented (UI, opt-in real adapters, red-team and
+multi-sample coverage, and a pinned `requirements.lock.txt`). The next slices are a manual
+Kdenlive-open verification pass on real hardware, a fully hashed lock via `uv`/`pip-compile`,
+and resolving the declared-but-unused `python-dotenv` dependency.
 
 ## GPT Pro Review Notes
 

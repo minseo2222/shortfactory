@@ -1,0 +1,40 @@
+# Dependency lock for Shorts Pipeline v2.1
+#
+# This is a version pin of the verified local test environment (the core
+# runtime dependencies plus the dev tools and their resolved transitive
+# closure). It is generated from the installed distributions, not from a hash
+# resolver; regenerate with `uv pip compile` or `pip-compile` when those tools
+# are available for a fully hashed lock.
+#
+# Optional extras are intentionally NOT pinned here because CI does not install
+# them and they are not exercised by the test suite:
+#   - [ui]:  streamlit
+#   - [llm]: openai, anthropic, google-genai
+#
+# Note: python-dotenv is declared in pyproject but is not imported by any module
+# (config reads os.environ directly) and was not installed in the verified
+# environment. It is pinned at the declared floor for completeness; see the
+# baseline audit "Known Risks and Gaps".
+
+# --- Core runtime closure (verified installed) ---
+annotated-types==0.7.0
+lxml==6.1.0
+packaging==24.2
+pillow==11.1.0
+pydantic==2.13.0
+pydantic-core==2.46.0
+python-dateutil==2.9.0.post0
+six==1.17.0
+typing-extensions==4.15.0
+typing-inspection==0.4.2
+
+# --- Declared but not loaded by current code (see audit) ---
+python-dotenv==1.0.1
+
+# --- Dev tools closure (verified installed) ---
+colorama==0.4.6
+iniconfig==2.3.0
+pluggy==1.6.0
+pygments==2.19.1
+pytest==9.0.3
+ruff==0.15.12
