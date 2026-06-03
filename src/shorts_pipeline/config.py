@@ -14,6 +14,20 @@ PROJECT_ROOT_ENV = "SHORTS_PIPELINE_PROJECT_ROOT"
 DB_PATH_ENV = "SHORTS_PIPELINE_DB_PATH"
 
 
+def load_local_env(dotenv_path: str | Path | None = None) -> bool:
+    """Load a local ``.env`` file into the process environment, if present.
+
+    Wires python-dotenv so the documented ``.env`` workflow (for example the
+    provider API keys used by the opt-in real LLM adapters) actually populates
+    ``os.environ``. Secret values are only loaded into the current process
+    environment; they are never logged, returned, or stored. Existing
+    environment variables are not overridden. Returns True if a file was loaded.
+    """
+    from dotenv import load_dotenv
+
+    return load_dotenv(dotenv_path=dotenv_path, override=False)
+
+
 def now_kst_iso(clock: Callable[[], datetime] | None = None) -> str:
     """Return the current time in KST as an ISO-8601 string."""
     current = clock() if clock else datetime.now(tz=KST)

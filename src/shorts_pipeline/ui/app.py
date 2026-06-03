@@ -17,6 +17,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from shorts_pipeline.config import load_local_env
 from shorts_pipeline.ui import controller as ctrl
 
 DEFAULT_BASE_DIR = str(Path(".local").resolve())
@@ -101,7 +102,9 @@ def _d_form(project_id: str) -> None:
     )
     with st.form("d_confirm"):
         slot_inputs: dict[str, dict[str, object]] = {}
-        all_rights = st.checkbox("I confirm I hold rights for every image", value=True)
+        all_rights = st.checkbox(
+            "I confirm I hold rights for every image", value=True, key="d_all_rights"
+        )
         for scene in timeline.scenes:
             st.markdown(f"**{scene.scene_id}** - `{scene.image_path}`")
             note = st.text_input(
@@ -137,6 +140,7 @@ def _show_f_result(project_id: str) -> None:
 
 
 def main() -> None:
+    load_local_env()
     st.set_page_config(page_title="Shorts Pipeline", layout="wide")
     st.title("Shorts Pipeline - local A->F")
     _sidebar()

@@ -166,10 +166,12 @@ Kdenlive XML.
 
 ## Dependency Lock
 
-`requirements.lock.txt` pins the verified core and dev dependency closure. The
-optional `ui` and `llm` extras are intentionally not pinned there because CI
-does not install them. Regenerate a fully hashed lock with `uv pip compile` or
-`pip-compile` when available.
+`requirements.lock.txt` is a pip `--generate-hashes` style hashed lock (sha256
+for every PyPI release file) of the verified core and dev dependency closure.
+Install reproducibly with `pip install --require-hashes -r requirements.lock.txt`.
+The optional `ui` and `llm` extras are intentionally not pinned there because CI
+does not install them. Regenerate with `uv pip compile --generate-hashes` or
+`pip-compile --generate-hashes` when those tools are available.
 
 ## Baseline Audit
 

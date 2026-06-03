@@ -99,6 +99,9 @@
 - UI controller tests cover the full A->F path, stage-by-stage status
   progression, default-fake/opt-in-real provider selection, status events, and
   D payload construction without importing Streamlit.
+- A headless Streamlit `AppTest` smoke drives `app.py` itself through A->F
+  (skipped when the `ui` extra is absent), so the rendering layer is exercised,
+  not just the controller.
 - Multi-sample smoke tests run twelve distinct synthetic candidates with varied
   valid scene plans (4-6 scenes, different styles and durations) through the full
   A->F path, asserting `script_generated` status, timeline/narration scene-count
@@ -123,14 +126,29 @@ Run `python -m streamlit run src/shorts_pipeline/ui/app.py`, then:
 
 The automatable parts of the Kdenlive handoff (XML parse, 1080x1920 30fps
 profile, and producer/timeline resource existence) are enforced by
-`tests/test_multisample_smoke.py` and `tests/test_f_kdenlive_project.py`. The
-following GUI steps still require a manual Kdenlive install and run:
+`tests/test_multisample_smoke.py` and `tests/test_f_kdenlive_project.py`.
+
+Generate a real sample to open:
+
+```bash
+python -m shorts_pipeline.dev_cli smoke \
+  --db-path .local/shorts.sqlite3 --projects-root .local/projects \
+  --use-fake-providers --run-f
+```
+
+This writes `.local/projects/PRJ_<date>_0001/project.kdenlive`. Before opening,
+the same structure/profile/resource checks the tests assert can be re-confirmed
+on the generated file; a self-validation run reports `1080x1920 30/1 fps`,
+all producer resources present, and `missing media: 0`.
+
+The remaining GUI steps require a manual Kdenlive install and run (e.g.
+`kdenlive "<abs path>\project.kdenlive"`):
 
 - Open `project.kdenlive` in Kdenlive.
-- Confirm no missing media.
-- Confirm slot image display.
-- Confirm text overlay display.
-- Confirm `slot_001.png` replacement is reflected.
+- Confirm no missing media warning appears.
+- Confirm slot image display on the image track.
+- Confirm text overlay display on the overlay track.
+- Confirm replacing `slot_001.png` (same filename) is reflected on reopen.
 
 ## Red-Team Tests
 

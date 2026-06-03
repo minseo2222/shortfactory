@@ -53,8 +53,9 @@ restrictions: null
 - `gpt_pro_first_response_a_to_f.md` - historical GPT Pro review/prompt context.
 - `pyproject.toml` - package metadata, runtime dependencies, optional extras, console script,
   pytest configuration, and Ruff configuration.
-- `requirements.lock.txt` - version pins of the verified core + dev dependency closure;
-  optional `ui`/`llm` extras are intentionally unpinned.
+- `requirements.lock.txt` - pip `--generate-hashes` style hashed lock (sha256 for every PyPI
+  release file) of the verified core + dev dependency closure; optional `ui`/`llm` extras are
+  intentionally unpinned.
 
 ### GitHub Workflow
 
@@ -158,6 +159,8 @@ restrictions: null
 - `tests/test_dev_cli_kdenlive.py` - dev Kdenlive CLI confirmation gate, JSON/human output,
   required args, unknown project, wrong status, and no-rendering flags.
 - `tests/test_db.py` - SQLite initialization and status CHECK constraint coverage.
+- `tests/test_config_dotenv.py` - `config.load_local_env` loads a local `.env` into the
+  environment, does not override existing variables, and is a no-op when the file is absent.
 - `tests/test_security.py` - path traversal, absolute path, external URL, media extension,
   and XML escaping coverage.
 - `tests/test_state_machine.py` - valid, invalid, and unknown state transition coverage.
@@ -167,8 +170,14 @@ restrictions: null
 - `tests/test_real_llm_providers.py` - offline unit tests for the optional real LLM adapters:
   JSON parsing, prompt construction, opt-in resolver, SDK/key error paths, no-literal-import
   guard discipline, and service drop-in integration with a fake completion client.
+- `tests/test_real_llm_sdk_contract.py` - importorskip-guarded contract tests asserting the
+  installed OpenAI/Anthropic/Gemini SDK client classes, request method signatures, and response
+  shapes match what the adapters call; skipped when the `llm` extra is absent (offline CI).
 - `tests/test_ui_controller.py` - Streamlit-free UI controller coverage: full A->F path,
   stage-by-stage status progression, provider selection, status events, and D payload builder.
+- `tests/test_ui_app_smoke.py` - headless Streamlit `AppTest` smoke that drives `app.py` through
+  the full A->F flow and asserts status progression and F handoff output; skipped when the `ui`
+  extra is absent (offline CI).
 - `tests/test_text_file_hygiene.py` - LF line-ending and hidden Unicode control checks for
   selected repo text files.
 
@@ -457,14 +466,19 @@ tests. The pre-audit `main` suite had 114 tests.
 - `tests/test_dev_cli_kdenlive.py` - Kdenlive CLI confirmation gate, JSON/human output,
   required args, unknown project, wrong status, and no-rendering flags.
 - `tests/test_db.py` - schema and status constraint.
+- `tests/test_config_dotenv.py` - optional `.env` loading via `config.load_local_env`.
 - `tests/test_security.py` - path and XML helpers.
 - `tests/test_state_machine.py` - transition rules.
 - `tests/test_timeline.py` - start-time helper.
 - `tests/test_ci_workflow.py` - CI workflow contract.
 - `tests/test_real_llm_providers.py` - optional real LLM adapter behavior, opt-in gating,
   error paths, and import-guard discipline, all without real SDKs or network.
+- `tests/test_real_llm_sdk_contract.py` - importorskip-guarded SDK surface contract for the
+  real adapters; skipped offline, exercised locally with the `llm` extra installed.
 - `tests/test_ui_controller.py` - UI orchestration controller: full A->F path, status
   progression, provider selection, and D payload construction without Streamlit.
+- `tests/test_ui_app_smoke.py` - headless Streamlit AppTest smoke driving app.py through A->F;
+  skipped offline, exercised locally with the `ui` extra installed.
 - `tests/test_baseline_audit_doc.py` - baseline audit document structure and key claims.
 - `tests/test_text_file_hygiene.py` - LF line-ending and hidden/bidirectional Unicode control
   checks for selected repository text files.
@@ -519,13 +533,16 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Known Risks and Gaps
 
-- Real LLM provider adapters are opt-in and disabled by default; they have no real-SDK or
-  network coverage in CI, so provider output quality is unverified.
-- A local Streamlit UI now drives A->F, but the Streamlit rendering layer itself is verified by
-  a manual checklist rather than automated UI tests (the controller is unit tested).
-- `python-dotenv` is declared in `pyproject.toml` but is not imported by any module (config
-  reads `os.environ` directly) and is not installed in the verified environment; consider
-  wiring `.env` loading or removing the dependency.
+- Real LLM provider adapters are opt-in and disabled by default. Their SDK surface (client
+  classes, request signatures, response shapes) is verified locally against installed SDKs by
+  `tests/test_real_llm_sdk_contract.py` (skipped offline in CI). No live API call is exercised,
+  so provider output quality is still unverified.
+- A local Streamlit UI drives A->F. The controller is unit tested and the rendering layer is
+  exercised by a headless Streamlit `AppTest` smoke (`tests/test_ui_app_smoke.py`, skipped
+  offline in CI); on-screen visual polish is still only checked by the manual checklist.
+- `python-dotenv` is now wired through `config.load_local_env`, called by the dev CLI and the
+  UI so a local `.env` populates `os.environ` (for example opt-in provider keys) without
+  overriding existing variables; secrets are never logged or stored.
 - No production Kdenlive project generation exists yet; Phase 6/F is a local
   self-generated editing skeleton only and still requires manual Kdenlive verification.
 - C currently generates canonical local files and PNG assets; F now generates a local
@@ -535,16 +552,20 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 - Baseline audit is hand-authored and should be reviewed against the repository tree by GPT Pro.
 - Some historical prompt/context material is retained for traceability and may not be as clean as
   the current implementation docs.
-- The old `codex/011-github-actions-ci` remote branch still exists and can be cleaned later.
+- Several feature branches are landed but not deleted. After this integration merges, the
+  `codex/029`..`codex/038` branches (already squashed/merged via their PRs) and the old
+  `codex/011-github-actions-ci` branch can be deleted; `codex/028-project-folder-verifier`
+  (PR #6) is still an open, unmerged proposal and should be reviewed separately.
 - Optional `llm` dependencies are declared in `pyproject.toml` but intentionally not installed
   by CI or used by source/tests.
 
 ## Recommended Next Implementation Slice
 
-The local A->F product scope is implemented (UI, opt-in real adapters, red-team and
-multi-sample coverage, and a pinned `requirements.lock.txt`). The next slices are a manual
-Kdenlive-open verification pass on real hardware, a fully hashed lock via `uv`/`pip-compile`,
-and resolving the declared-but-unused `python-dotenv` dependency.
+The local A->F product scope is implemented and verified: UI, opt-in real adapters wired to
+`.env`, red-team and multi-sample coverage, a hashed `requirements.lock.txt`, and SDK-surface,
+Streamlit-UI, and Kdenlive-handoff checks run with the optional extras installed locally. The
+remaining work is operational (a manual Kdenlive GUI open on real hardware and periodic lock
+regeneration), not new product scope.
 
 ## GPT Pro Review Notes
 
