@@ -499,6 +499,9 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
   allowed in artifacts.
 - Source artifacts store only minimal metadata and explicit storage policy flags.
 - Generated artifact paths are safe relative paths and are checked against project-root containment.
+  Path validation is platform-independent (backslash normalization + POSIX-semantics analysis), and
+  the SQLite CHECK constraints reject backslash and drive-letter `project_dir`/`relative_path`
+  values, so traversal/drive/UNC paths are blocked identically on Linux (CI) and Windows.
 - Artifact rows store SHA-256 hashes; smoke and inspect verify them.
 - D image manifest blocks E readiness for unconfirmed rights, personal information, original
   captures, unsafe paths, missing files, dimension/format problems, face-rights gaps, community

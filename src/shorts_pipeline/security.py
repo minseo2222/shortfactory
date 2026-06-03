@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from html import escape
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
 
 ALLOWED_MEDIA_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+_DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
 
 
 class SecurityValidationError(ValueError):
@@ -15,20 +17,33 @@ class SecurityValidationError(ValueError):
 
 
 def ensure_relative_project_path(path: str | Path) -> Path:
-    """Validate that a path is relative and stays inside a project directory."""
+    """Validate that a path is relative and stays inside a project directory.
+
+    The check is platform-independent: backslashes are normalized to forward
+    slashes and the path is analyzed with POSIX semantics, so Windows-style
+    traversal (``foo\\..\\bar``), drive-relative paths (``C:foo``), and UNC
+    paths (``\\\\server\\share``) are rejected identically on Linux and Windows.
+    """
     raw = str(path)
+    if not raw.strip():
+        raise SecurityValidationError("path must not be empty")
+
     parsed = urlparse(raw)
     if parsed.scheme or parsed.netloc:
         raise SecurityValidationError("external resource URLs are not allowed")
 
-    candidate = Path(path)
-    if candidate.is_absolute() or candidate.anchor:
+    normalized = raw.replace("\\", "/")
+    if _DRIVE_PREFIX.match(normalized):
+        raise SecurityValidationError("drive-letter paths are not allowed")
+    if normalized.startswith("/"):
         raise SecurityValidationError("absolute paths are not allowed")
-    if any(part == ".." for part in candidate.parts):
+
+    posix = PurePosixPath(normalized)
+    if posix.is_absolute() or posix.anchor:
+        raise SecurityValidationError("absolute paths are not allowed")
+    if any(part == ".." for part in posix.parts):
         raise SecurityValidationError("path traversal is not allowed")
-    if not raw.strip():
-        raise SecurityValidationError("path must not be empty")
-    return candidate
+    return Path(normalized)
 
 
 def ensure_path_under_root(root: str | Path, path: str | Path) -> Path:
