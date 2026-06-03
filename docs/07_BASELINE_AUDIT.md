@@ -169,6 +169,9 @@ restrictions: null
   guard discipline, and service drop-in integration with a fake completion client.
 - `tests/test_ui_controller.py` - Streamlit-free UI controller coverage: full A->F path,
   stage-by-stage status progression, provider selection, status events, and D payload builder.
+- `tests/test_ui_app_smoke.py` - headless Streamlit `AppTest` smoke that drives `app.py` through
+  the full A->F flow and asserts status progression and F handoff output; skipped when the `ui`
+  extra is absent (offline CI).
 - `tests/test_text_file_hygiene.py` - LF line-ending and hidden Unicode control checks for
   selected repo text files.
 
@@ -465,6 +468,8 @@ tests. The pre-audit `main` suite had 114 tests.
   error paths, and import-guard discipline, all without real SDKs or network.
 - `tests/test_ui_controller.py` - UI orchestration controller: full A->F path, status
   progression, provider selection, and D payload construction without Streamlit.
+- `tests/test_ui_app_smoke.py` - headless Streamlit AppTest smoke driving app.py through A->F;
+  skipped offline, exercised locally with the `ui` extra installed.
 - `tests/test_baseline_audit_doc.py` - baseline audit document structure and key claims.
 - `tests/test_text_file_hygiene.py` - LF line-ending and hidden/bidirectional Unicode control
   checks for selected repository text files.
@@ -521,8 +526,9 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 - Real LLM provider adapters are opt-in and disabled by default; they have no real-SDK or
   network coverage in CI, so provider output quality is unverified.
-- A local Streamlit UI now drives A->F, but the Streamlit rendering layer itself is verified by
-  a manual checklist rather than automated UI tests (the controller is unit tested).
+- A local Streamlit UI drives A->F. The controller is unit tested and the rendering layer is
+  exercised by a headless Streamlit `AppTest` smoke (`tests/test_ui_app_smoke.py`, skipped
+  offline in CI); on-screen visual polish is still only checked by the manual checklist.
 - `python-dotenv` is declared in `pyproject.toml` but is not imported by any module (config
   reads `os.environ` directly) and is not installed in the verified environment; consider
   wiring `.env` loading or removing the dependency.
