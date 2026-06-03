@@ -81,10 +81,12 @@ jobs:
           secret_patterns = [
               re.compile(r"ghp_[A-Za-z0-9_]{20,}"),
               re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),
-              re.compile(r"sk-[A-Za-z0-9]{20,}"),
+              re.compile(r"sk-[A-Za-z0-9_-]{20,}"),
+              re.compile(r"AIza[A-Za-z0-9_-]{30,}"),
               re.compile(r"OPENAI_API_KEY\s*=\s*['\"][^'\"]+['\"]"),
               re.compile(r"ANTHROPIC_API_KEY\s*=\s*['\"][^'\"]+['\"]"),
               re.compile(r"GEMINI_API_KEY\s*=\s*['\"][^'\"]+['\"]"),
+              re.compile(r"GOOGLE_API_KEY\s*=\s*['\"][^'\"]+['\"]"),
           ]
 
           matches = []
@@ -94,7 +96,10 @@ jobs:
               for path in root.rglob("*"):
                   if not path.is_file():
                       continue
-                  if path.suffix not in {".py", ".yml", ".yaml", ".toml", ".md"}:
+                  if path.suffix not in {
+                      ".py", ".yml", ".yaml", ".toml", ".md", ".json",
+                      ".txt", ".cfg", ".ini", ".env", ".example",
+                  }:
                       continue
                   text = path.read_text(encoding="utf-8", errors="ignore")
                   for pattern in secret_patterns:

@@ -527,12 +527,23 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 - Lint: `python -m ruff check .`.
 - Tests: `python -m pytest`.
 - Network/provider import guard: scans Python imports in `src` and `tests`.
-- Obvious-secret guard: scans `src`, `tests`, and `.github` for token/key patterns.
+- Obvious-secret guard: scans `src`, `tests`, and `.github` for token/key patterns, including
+  `ghp_`/`github_pat_`, `sk-`/`sk-proj-`/`sk-ant-`, Google `AIza` keys, and quoted
+  `OPENAI/ANTHROPIC/GEMINI/GOOGLE_API_KEY` assignments, across `.py/.yml/.yaml/.toml/.md/.json/
+  .txt/.cfg/.ini/.env/.example` files. (Best-effort lint, not a sandbox.)
 - Required branch-protection check name: `pytest and ruff`.
 - CI does not install optional `llm` extras and does not require API keys.
 
 ## Known Risks and Gaps
 
+- F frame layout now tiles exactly: per-scene `duration_frames` is derived from the gap to the
+  next scene's `start_frame` (last runs to `total_frames`), so fractional-second durations no
+  longer produce 1-frame gaps/overlaps.
+- Accepted low-risk items left as-is: `security.xml_escape_text` is a tested helper but is not
+  wired into the F builder because `xml.etree.ElementTree` auto-escapes on write; the `events`
+  table is reserved and currently unused; and Phase C copies a placeholder into each user-image
+  slot, which is safe only because C is `planned`-only (it should not become re-runnable without
+  a non-overwrite guard).
 - Real LLM provider adapters are opt-in and disabled by default. Their SDK surface (client
   classes, request signatures, response shapes) is verified locally against installed SDKs by
   `tests/test_real_llm_sdk_contract.py` (skipped offline in CI). No live API call is exercised,
