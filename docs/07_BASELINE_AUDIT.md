@@ -492,6 +492,10 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 - Optional adapters load their SDK dynamically via importlib (no literal SDK import statements),
   read API keys only from the environment at client-construction time, and never store keys in
   artifacts, the DB, logs, or provider object attributes.
+- Outbound prompts are minimized: B and E send only an allow-listed, length-bounded projection
+  (summary fields plus per-scene narration inputs); `source_url`, project IDs, file paths,
+  SHA-256 hashes, and the full timeline/D-manifest are never transmitted, and each prompt is
+  refused if it carries raw-source or secret markers.
 - B and E default to injected provider protocols and deterministic fake providers in tests/dev smoke.
 - CI guards against direct imports of real provider/network clients in `src` and `tests`.
 - No automated crawling or scraping is implemented.

@@ -35,13 +35,17 @@ Forbidden:
 - Including inferred personal information in LLM input.
 - Storing validation-failed LLM output as an artifact.
 
-Allowed:
+Allowed (and exactly what the opt-in real adapters send):
 
-- User-written summary.
-- Minimal source metadata.
-- Risk flags.
-- Timeline fact basis.
-- D manifest notes.
+- B: an allow-listed, length-bounded projection of source metadata — source
+  title, user-written summary, hook, why-shortable, and risk flags only.
+- E: per-scene narration inputs (scene id, duration, screen text, fact basis,
+  avoid claims, and the D image note) plus the same bounded source summary.
+
+Never sent to a provider: `source_url`, project IDs, timestamps, storage flags,
+file paths, SHA-256 hashes, or the full timeline/D-manifest. Each outbound
+prompt is also scanned and refused if it carries raw-source or secret markers
+(`minimize_b_source` / `minimize_e_context` in `llm/real_providers.py`).
 
 ## Content Safety
 

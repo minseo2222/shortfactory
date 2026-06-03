@@ -255,6 +255,110 @@ def _user_prompt(payload: dict[str, Any], previous_errors: list[str]) -> str:
     return "\n\n".join(parts)
 
 
+# --- Outbound minimization (limit what actually leaves the machine) ---------
+
+OUTBOUND_MAX_STRING = 600
+# Markers that must never be transmitted to a provider (raw-source dumps and
+# secret shapes). Kept narrow to avoid blocking ordinary summaries.
+_OUTBOUND_FORBIDDEN_MARKERS = (
+    "full_text",
+    "raw_html",
+    "comment_dump",
+    "api_key",
+    "secret",
+    "password",
+    "sk-",
+    "ghp_",
+    "github_pat_",
+)
+
+
+class OutboundContentError(RuntimeError):
+    """Raised when an outbound prompt would carry raw-source or secret markers."""
+
+
+def _bounded(value: Any) -> Any:
+    return value[:OUTBOUND_MAX_STRING] if isinstance(value, str) else value
+
+
+def _iter_outbound_strings(value: Any) -> list[str]:
+    found: list[str] = []
+    if isinstance(value, dict):
+        for child in value.values():
+            found.extend(_iter_outbound_strings(child))
+    elif isinstance(value, (list, tuple)):
+        for child in value:
+            found.extend(_iter_outbound_strings(child))
+    elif isinstance(value, str):
+        found.append(value)
+    return found
+
+
+def _assert_outbound_safe(payload: dict[str, Any]) -> None:
+    for text in _iter_outbound_strings(payload):
+        lowered = text.casefold()
+        if any(marker in lowered for marker in _OUTBOUND_FORBIDDEN_MARKERS):
+            raise OutboundContentError(
+                "refusing to send a prompt containing raw-source or secret markers"
+            )
+
+
+def minimize_b_source(source_payload: dict[str, Any]) -> dict[str, Any]:
+    """Allow-listed, length-bounded projection of source metadata for B.
+
+    Drops `source_url`, `project_id`, timestamps, and storage flags; only the
+    user-authored summary fields are sent to the provider.
+    """
+    minimal = {
+        "source_title": _bounded(source_payload.get("source_title", "")),
+        "summary": _bounded(source_payload.get("user_or_llm_summary", "")),
+        "hook": _bounded(source_payload.get("hook", "")),
+        "why_shortable": _bounded(source_payload.get("why_shortable", "")),
+        "risk_flags": list(source_payload.get("risk_flags_for_user", []))[:10],
+    }
+    _assert_outbound_safe(minimal)
+    return minimal
+
+
+def minimize_e_context(context: dict[str, Any]) -> dict[str, Any]:
+    """Allow-listed, length-bounded projection of the E context.
+
+    Sends only per-scene narration inputs and the user summary; drops file
+    paths, SHA-256 hashes, `source_url`, project IDs, and the full manifest.
+    """
+    timeline = context.get("timeline_json", {}) or {}
+    manifest = context.get("d_image_manifest", {}) or {}
+    notes = {
+        slot.get("scene_id"): slot.get("actual_image_note")
+        for slot in manifest.get("slots", [])
+    }
+    scenes = [
+        {
+            "scene_id": scene.get("scene_id"),
+            "duration_sec": scene.get("duration_sec"),
+            "screen_text": _bounded(scene.get("screen_text", "")),
+            "fact_basis": [_bounded(item) for item in scene.get("fact_basis", [])],
+            "avoid_claims": [_bounded(item) for item in scene.get("avoid_claims", [])],
+            "image_note": _bounded(notes.get(scene.get("scene_id"), "")),
+        }
+        for scene in timeline.get("scenes", [])
+    ]
+    reference = context.get("source_reference", {}) or {}
+    minimal = {
+        "scenes": scenes,
+        "source": {
+            "source_title": _bounded(reference.get("source_title", "")),
+            "summary": _bounded(reference.get("summary", "")),
+            "hook": _bounded(reference.get("hook", "")),
+            "why_shortable": _bounded(reference.get("why_shortable", "")),
+            "risk_flags": list(reference.get("risk_flags_for_user", []))[:10],
+        },
+        "voice_policy": context.get("voice_policy", {}),
+    }
+    _assert_outbound_safe(minimal)
+    return minimal
+
+
 # --- Provider adapters ------------------------------------------------------
 
 
@@ -273,7 +377,8 @@ class RealBScenePlanProvider:
         prompt_version: str,
         previous_errors: list[str],
     ) -> dict[str, Any]:
-        user = _user_prompt(source.model_dump(mode="json"), previous_errors)
+        minimal = minimize_b_source(source.model_dump(mode="json"))
+        user = _user_prompt(minimal, previous_errors)
         raw = self._client.complete_json(system=_b_system_prompt(), user=user)
         return _parse_json_object(raw)
 
@@ -293,7 +398,7 @@ class RealEScriptProvider:
         prompt_version: str,
         previous_errors: list[str],
     ) -> dict[str, Any]:
-        user = _user_prompt(context, previous_errors)
+        user = _user_prompt(minimize_e_context(context), previous_errors)
         raw = self._client.complete_json(system=_e_system_prompt(), user=user)
         return _parse_json_object(raw)
 
