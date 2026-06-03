@@ -206,3 +206,42 @@ def test_source_write_failure_rolls_back_db_row_and_folder(tmp_path, monkeypatch
 
     assert read_project_rows(db_path) == []
     assert not (projects_root / "PRJ_20260529_0001").exists()
+
+
+def test_concurrent_project_creation_allocates_unique_ids(tmp_path) -> None:
+    import copy
+    import threading
+
+    db_path = tmp_path / "shorts.sqlite3"
+    projects_root = tmp_path / "projects"
+    base = load_candidate()
+
+    # Initialize the DB once first (the production scenario is concurrent tabs on
+    # an existing DB), so the test exercises the ID-allocation race rather than
+    # schema-creation contention.
+    first = create_project_from_candidate(
+        copy.deepcopy(base), db_path=db_path, projects_root=projects_root
+    )
+    results: list[str] = [first.project_id]
+    errors: list[Exception] = []
+    lock = threading.Lock()
+
+    def worker() -> None:
+        try:
+            project = create_project_from_candidate(
+                copy.deepcopy(base), db_path=db_path, projects_root=projects_root
+            )
+            with lock:
+                results.append(project.project_id)
+        except Exception as exc:  # captured for the assertion below
+            with lock:
+                errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert not errors, errors
+    assert len(set(results)) == len(results) == 5  # BEGIN IMMEDIATE serializes IDs

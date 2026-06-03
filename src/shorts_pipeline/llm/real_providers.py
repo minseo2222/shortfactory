@@ -24,6 +24,7 @@ from __future__ import annotations
 import importlib
 import json
 import os
+import time
 from typing import Any, Protocol
 
 from shorts_pipeline.models import BScenePlan, EScript, SourceArtifact
@@ -100,24 +101,90 @@ def _import_sdk(module_name: str):
         ) from exc
 
 
+def _strip_code_fences(text: str) -> str:
+    if not text.startswith("```"):
+        return text
+    lines = text.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip().startswith("```"):
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
+
+
 def _parse_json_object(raw: str) -> dict[str, Any]:
-    """Parse a model response into a single JSON object payload."""
-    text = (raw or "").strip()
-    if text.startswith("```"):
-        # Strip a leading ```json / ``` fence and the trailing fence.
-        lines = text.splitlines()
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip().startswith("```"):
-            lines = lines[:-1]
-        text = "\n".join(lines).strip()
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise LlmResponseError("provider response was not valid JSON") from exc
-    if not isinstance(parsed, dict):
-        raise LlmResponseError("provider response JSON must be a single object")
-    return parsed
+    """Parse a model response into a single JSON object payload.
+
+    Tolerates a leading/trailing code fence and, as a fallback, a JSON object
+    embedded in surrounding prose (e.g. "Here is the JSON: {...}").
+    """
+    text = _strip_code_fences((raw or "").strip())
+    candidates = [text]
+    start, end = text.find("{"), text.rfind("}")
+    if start != -1 and end > start:
+        embedded = text[start : end + 1]
+        if embedded != text:
+            candidates.append(embedded)
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(parsed, dict):
+            raise LlmResponseError("provider response JSON must be a single object")
+        return parsed
+    raise LlmResponseError("provider response was not valid JSON")
+
+
+# --- Resilience: timeout, transient retry, error normalization --------------
+
+REQUEST_TIMEOUT_SECONDS = 60
+TRANSIENT_RETRY_ATTEMPTS = 2
+_TRANSIENT_STATUS_CODES = {408, 409, 429, 500, 502, 503, 504}
+_TRANSIENT_NAME_MARKERS = (
+    "timeout",
+    "connection",
+    "ratelimit",
+    "serviceunavailable",
+    "apiconnection",
+    "internalserver",
+    "overloaded",
+)
+
+
+class LlmTransientError(RuntimeError):
+    """Raised when a provider call keeps failing with transient errors."""
+
+
+def _is_transient(exc: BaseException) -> bool:
+    status = getattr(exc, "status_code", None)
+    if status is None:
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+    if status in _TRANSIENT_STATUS_CODES:
+        return True
+    name = type(exc).__name__.casefold()
+    return any(marker in name for marker in _TRANSIENT_NAME_MARKERS)
+
+
+def _run_sdk_call(call, *, attempts: int = TRANSIENT_RETRY_ATTEMPTS):
+    """Run an SDK call, retrying transient failures with backoff.
+
+    Non-transient errors (e.g. auth failures) propagate unchanged. Transient
+    failures that exhaust retries are normalized into ``LlmTransientError``.
+    """
+    last: BaseException | None = None
+    for attempt in range(attempts + 1):
+        try:
+            return call()
+        except Exception as exc:  # noqa: BLE001 - classified below
+            if not _is_transient(exc):
+                raise
+            last = exc
+            if attempt < attempts:
+                time.sleep(min(2**attempt, 8))
+    raise LlmTransientError(
+        f"provider call failed after {attempts + 1} attempts: {type(last).__name__}"
+    ) from last
 
 
 # --- Backends (real SDK seams; loaded lazily via importlib) -----------------
@@ -137,14 +204,17 @@ class _OpenAIBackend:
 
     def complete_json(self, *, system: str, user: str) -> str:
         client = self._ensure_client()
-        response = client.chat.completions.create(
-            model=self._model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0,
+        response = _run_sdk_call(
+            lambda: client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
         )
         return response.choices[0].message.content or ""
 
@@ -163,11 +233,14 @@ class _AnthropicBackend:
 
     def complete_json(self, *, system: str, user: str) -> str:
         client = self._ensure_client()
-        response = client.messages.create(
-            model=self._model,
-            max_tokens=2048,
-            system=system,
-            messages=[{"role": "user", "content": user}],
+        response = _run_sdk_call(
+            lambda: client.messages.create(
+                model=self._model,
+                max_tokens=2048,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
         )
         return "".join(
             getattr(block, "text", "")
@@ -190,10 +263,12 @@ class _GeminiBackend:
 
     def complete_json(self, *, system: str, user: str) -> str:
         client = self._ensure_client()
-        response = client.models.generate_content(
-            model=self._model,
-            contents=f"{system}\n\n{user}",
-            config={"response_mime_type": "application/json"},
+        response = _run_sdk_call(
+            lambda: client.models.generate_content(
+                model=self._model,
+                contents=f"{system}\n\n{user}",
+                config={"response_mime_type": "application/json"},
+            )
         )
         return response.text or ""
 
