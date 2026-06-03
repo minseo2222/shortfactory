@@ -141,10 +141,26 @@ the same structure/profile/resource checks the tests assert can be re-confirmed
 on the generated file; a self-validation run reports `1080x1920 30/1 fps`,
 all producer resources present, and `missing media: 0`.
 
-The remaining GUI steps require a manual Kdenlive install and run (e.g.
+Headless engine verification (recorded 2026-06-03): the project was loaded with
+Kdenlive's own MLT engine, run from the project folder (the same root Kdenlive
+uses) without rendering:
+
+```bash
+cd .local/projects/PRJ_<date>_0001
+melt project.kdenlive -consumer xml   # re-serialize only; no MP4 render
+```
+
+It exited 0 with an empty stderr and zero `failed to load producer` messages,
+i.e. all eight image and text-overlay producers resolved (missing media: 0). As
+a control, running the same load from the wrong working directory reports
+`failed to load` for every producer, confirming the engine does flag missing
+media, so the clean result is meaningful. The melt run is a one-off manual
+verification step and is intentionally not part of the automated test suite (the
+pipeline never runs Kdenlive or melt).
+
+The remaining optional check is the visual GUI pass (open in Kdenlive, e.g.
 `kdenlive "<abs path>\project.kdenlive"`):
 
-- Open `project.kdenlive` in Kdenlive.
 - Confirm no missing media warning appears.
 - Confirm slot image display on the image track.
 - Confirm text overlay display on the overlay track.
