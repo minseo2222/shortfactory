@@ -53,8 +53,9 @@ restrictions: null
 - `gpt_pro_first_response_a_to_f.md` - historical GPT Pro review/prompt context.
 - `pyproject.toml` - package metadata, runtime dependencies, optional extras, console script,
   pytest configuration, and Ruff configuration.
-- `requirements.lock.txt` - version pins of the verified core + dev dependency closure;
-  optional `ui`/`llm` extras are intentionally unpinned.
+- `requirements.lock.txt` - pip `--generate-hashes` style hashed lock (sha256 for every PyPI
+  release file) of the verified core + dev dependency closure; optional `ui`/`llm` extras are
+  intentionally unpinned.
 
 ### GitHub Workflow
 
@@ -544,10 +545,11 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Recommended Next Implementation Slice
 
-The local A->F product scope is implemented (UI, opt-in real adapters wired to `.env`, red-team
-and multi-sample coverage, and a pinned `requirements.lock.txt`). The remaining slice is a fully
-hashed lock via `uv`/`pip-compile`; the SDK surface, the Streamlit UI, and the Kdenlive handoff
-are now verified by tests run with the optional extras installed locally.
+The local A->F product scope is implemented and verified: UI, opt-in real adapters wired to
+`.env`, red-team and multi-sample coverage, a hashed `requirements.lock.txt`, and SDK-surface,
+Streamlit-UI, and Kdenlive-handoff checks run with the optional extras installed locally. The
+remaining work is operational (a manual Kdenlive GUI open on real hardware and periodic lock
+regeneration), not new product scope.
 
 ## GPT Pro Review Notes
 
