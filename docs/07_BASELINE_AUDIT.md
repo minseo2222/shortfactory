@@ -562,10 +562,11 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 ## Recommended Next Implementation Slice
 
 The local A->F product scope is implemented and verified: UI, opt-in real adapters wired to
-`.env`, red-team and multi-sample coverage, a hashed `requirements.lock.txt`, and SDK-surface,
-Streamlit-UI, and Kdenlive-handoff checks run with the optional extras installed locally. The
-remaining work is operational (a manual Kdenlive GUI open on real hardware and periodic lock
-regeneration), not new product scope.
+`.env`, red-team and multi-sample coverage, a hashed `requirements.lock.txt`, SDK-surface and
+Streamlit-UI checks run with the optional extras installed locally, and a headless MLT (melt)
+load of a generated `project.kdenlive` confirming zero missing media. The remaining work is
+operational (an optional Kdenlive GUI visual pass and periodic lock regeneration), not new
+product scope.
 
 ## GPT Pro Review Notes
 
