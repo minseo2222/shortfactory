@@ -552,7 +552,10 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 - Baseline audit is hand-authored and should be reviewed against the repository tree by GPT Pro.
 - Some historical prompt/context material is retained for traceability and may not be as clean as
   the current implementation docs.
-- The old `codex/011-github-actions-ci` remote branch still exists and can be cleaned later.
+- Several feature branches are landed but not deleted. After this integration merges, the
+  `codex/029`..`codex/038` branches (already squashed/merged via their PRs) and the old
+  `codex/011-github-actions-ci` branch can be deleted; `codex/028-project-folder-verifier`
+  (PR #6) is still an open, unmerged proposal and should be reviewed separately.
 - Optional `llm` dependencies are declared in `pyproject.toml` but intentionally not installed
   by CI or used by source/tests.
 
