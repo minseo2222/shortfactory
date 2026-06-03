@@ -17,6 +17,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from shorts_pipeline.config import load_local_env
 from shorts_pipeline.ui import controller as ctrl
 
 DEFAULT_BASE_DIR = str(Path(".local").resolve())
@@ -137,6 +138,7 @@ def _show_f_result(project_id: str) -> None:
 
 
 def main() -> None:
+    load_local_env()
     st.set_page_config(page_title="Shorts Pipeline", layout="wide")
     st.title("Shorts Pipeline - local A->F")
     _sidebar()

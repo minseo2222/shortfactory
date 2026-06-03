@@ -158,6 +158,8 @@ restrictions: null
 - `tests/test_dev_cli_kdenlive.py` - dev Kdenlive CLI confirmation gate, JSON/human output,
   required args, unknown project, wrong status, and no-rendering flags.
 - `tests/test_db.py` - SQLite initialization and status CHECK constraint coverage.
+- `tests/test_config_dotenv.py` - `config.load_local_env` loads a local `.env` into the
+  environment, does not override existing variables, and is a no-op when the file is absent.
 - `tests/test_security.py` - path traversal, absolute path, external URL, media extension,
   and XML escaping coverage.
 - `tests/test_state_machine.py` - valid, invalid, and unknown state transition coverage.
@@ -457,6 +459,7 @@ tests. The pre-audit `main` suite had 114 tests.
 - `tests/test_dev_cli_kdenlive.py` - Kdenlive CLI confirmation gate, JSON/human output,
   required args, unknown project, wrong status, and no-rendering flags.
 - `tests/test_db.py` - schema and status constraint.
+- `tests/test_config_dotenv.py` - optional `.env` loading via `config.load_local_env`.
 - `tests/test_security.py` - path and XML helpers.
 - `tests/test_state_machine.py` - transition rules.
 - `tests/test_timeline.py` - start-time helper.
@@ -523,9 +526,9 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
   network coverage in CI, so provider output quality is unverified.
 - A local Streamlit UI now drives A->F, but the Streamlit rendering layer itself is verified by
   a manual checklist rather than automated UI tests (the controller is unit tested).
-- `python-dotenv` is declared in `pyproject.toml` but is not imported by any module (config
-  reads `os.environ` directly) and is not installed in the verified environment; consider
-  wiring `.env` loading or removing the dependency.
+- `python-dotenv` is now wired through `config.load_local_env`, called by the dev CLI and the
+  UI so a local `.env` populates `os.environ` (for example opt-in provider keys) without
+  overriding existing variables; secrets are never logged or stored.
 - No production Kdenlive project generation exists yet; Phase 6/F is a local
   self-generated editing skeleton only and still requires manual Kdenlive verification.
 - C currently generates canonical local files and PNG assets; F now generates a local
@@ -541,10 +544,10 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Recommended Next Implementation Slice
 
-The local A->F product scope is implemented (UI, opt-in real adapters, red-team and
-multi-sample coverage, and a pinned `requirements.lock.txt`). The next slices are a manual
-Kdenlive-open verification pass on real hardware, a fully hashed lock via `uv`/`pip-compile`,
-and resolving the declared-but-unused `python-dotenv` dependency.
+The local A->F product scope is implemented (UI, opt-in real adapters wired to `.env`, red-team
+and multi-sample coverage, and a pinned `requirements.lock.txt`). The remaining slice is a fully
+hashed lock via `uv`/`pip-compile`; the SDK surface, the Streamlit UI, and the Kdenlive handoff
+are now verified by tests run with the optional extras installed locally.
 
 ## GPT Pro Review Notes
 

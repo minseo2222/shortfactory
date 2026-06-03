@@ -9,7 +9,7 @@ from collections.abc import Callable, Sequence
 from datetime import datetime
 from pathlib import Path
 
-from shorts_pipeline.config import KST
+from shorts_pipeline.config import KST, load_local_env
 from shorts_pipeline.inspect import inspect_project
 from shorts_pipeline.models import (
     FKdenliveManifest,
@@ -302,6 +302,7 @@ def _run_inspect_command(args: argparse.Namespace) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    load_local_env()
     parser = _build_parser()
     try:
         args = parser.parse_args(list(argv) if argv is not None else None)
