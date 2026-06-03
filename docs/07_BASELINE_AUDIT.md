@@ -167,6 +167,9 @@ restrictions: null
 - `tests/test_real_llm_providers.py` - offline unit tests for the optional real LLM adapters:
   JSON parsing, prompt construction, opt-in resolver, SDK/key error paths, no-literal-import
   guard discipline, and service drop-in integration with a fake completion client.
+- `tests/test_real_llm_sdk_contract.py` - importorskip-guarded contract tests asserting the
+  installed OpenAI/Anthropic/Gemini SDK client classes, request method signatures, and response
+  shapes match what the adapters call; skipped when the `llm` extra is absent (offline CI).
 - `tests/test_ui_controller.py` - Streamlit-free UI controller coverage: full A->F path,
   stage-by-stage status progression, provider selection, status events, and D payload builder.
 - `tests/test_text_file_hygiene.py` - LF line-ending and hidden Unicode control checks for
@@ -463,6 +466,8 @@ tests. The pre-audit `main` suite had 114 tests.
 - `tests/test_ci_workflow.py` - CI workflow contract.
 - `tests/test_real_llm_providers.py` - optional real LLM adapter behavior, opt-in gating,
   error paths, and import-guard discipline, all without real SDKs or network.
+- `tests/test_real_llm_sdk_contract.py` - importorskip-guarded SDK surface contract for the
+  real adapters; skipped offline, exercised locally with the `llm` extra installed.
 - `tests/test_ui_controller.py` - UI orchestration controller: full A->F path, status
   progression, provider selection, and D payload construction without Streamlit.
 - `tests/test_baseline_audit_doc.py` - baseline audit document structure and key claims.
@@ -519,8 +524,10 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Known Risks and Gaps
 
-- Real LLM provider adapters are opt-in and disabled by default; they have no real-SDK or
-  network coverage in CI, so provider output quality is unverified.
+- Real LLM provider adapters are opt-in and disabled by default. Their SDK surface (client
+  classes, request signatures, response shapes) is verified locally against installed SDKs by
+  `tests/test_real_llm_sdk_contract.py` (skipped offline in CI). No live API call is exercised,
+  so provider output quality is still unverified.
 - A local Streamlit UI now drives A->F, but the Streamlit rendering layer itself is verified by
   a manual checklist rather than automated UI tests (the controller is unit tested).
 - `python-dotenv` is declared in `pyproject.toml` but is not imported by any module (config
