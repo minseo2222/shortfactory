@@ -119,6 +119,8 @@ restrictions: null
 - `src/shorts_pipeline/projectgen/timeline.py` - timeline start-time assignment and B-to-timeline build helper.
 - `src/shorts_pipeline/projectgen/placeholder.py` - local Pillow placeholder PNG generation.
 - `src/shorts_pipeline/projectgen/text_overlay.py` - local transparent text overlay PNG generation.
+- `src/shorts_pipeline/projectgen/fonts.py` - CJK-capable TrueType font resolution (env-overridable)
+  for Hangul rendering in generated PNGs, with a PIL-default fallback.
 - `src/shorts_pipeline/projectgen/replace_images.py` - local replacement instruction Markdown generation.
 - `src/shorts_pipeline/projectgen/kdenlive.py` - standard-library XML builder for the
   self-generated F Kdenlive/MLT skeleton.
@@ -139,6 +141,8 @@ restrictions: null
   status transition, and no-provider behavior.
 - `tests/test_c_compiler.py` - Phase C timeline, generated PNGs, replacement guide,
   DB artifacts, validators, and blocked input/status cases.
+- `tests/test_text_rendering.py` - generated PNGs render Korean (CJK) glyphs and the destructive
+  latin-1 round-trip is gone; glyph assertions skip when no CJK font is installed.
 - `tests/test_d_image_manifest.py` - Phase D draft, confirmation, file/hash validation,
   rights and safety blockers, and E readiness gate.
 - `tests/test_e_script_generation.py` - Phase E D-readiness requirement, provider injection,
@@ -447,6 +451,7 @@ tests. The pre-audit `main` suite had 114 tests.
 - `tests/test_b_generation.py` - B happy path, retry success/exhaustion, validators, no-provider gate.
 - `tests/test_c_compiler.py` - C happy path, timing, generated PNGs, guide, blocked status/input,
   and timeline validator.
+- `tests/test_text_rendering.py` - CJK glyph rendering and latin-1 regression guard for PNGs.
 - `tests/test_d_image_manifest.py` - D draft/confirmation, direct confirmation, readiness,
   unsafe flags, path, image, dimension, note, rights, face, hash, and forbidden field blockers.
 - `tests/test_e_script_generation.py` - E happy path, D readiness requirement, provider gate,
@@ -533,6 +538,10 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Known Risks and Gaps
 
+- Generated overlay/placeholder PNGs render Hangul using a CJK TrueType font resolved from common
+  platform locations (overridable via `SHORTS_PIPELINE_FONT_PATH`). On a machine with no CJK font
+  installed, text falls back to PIL's default font (no Hangul glyphs); install a CJK font or set
+  the override for correct Korean output.
 - Real LLM provider adapters are opt-in and disabled by default. Their SDK surface (client
   classes, request signatures, response shapes) is verified locally against installed SDKs by
   `tests/test_real_llm_sdk_contract.py` (skipped offline in CI). No live API call is exercised,
