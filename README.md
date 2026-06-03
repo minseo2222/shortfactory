@@ -8,7 +8,7 @@ generates local project files for later manual editing in Kdenlive.
 
 ## v2.1 Scope
 
-- Streamlit-based local UI in a later phase.
+- Streamlit-based local UI for the A through F flow.
 - SQLite-based project storage.
 - Manual URL input only.
 - B: structured scene plan generation contract.
@@ -29,18 +29,23 @@ generates local project files for later manual editing in Kdenlive.
 - Trusting or mutating external `.kdenlive` files.
 - Automatic final MP4 rendering.
 
-## First Implementation Scope
+## Implemented Scope
 
-This repository currently implements the first scaffold round:
+The local A through F backend is implemented and covered by tests:
 
-1. Project docs and baseline config.
-2. Python package scaffold.
-3. Pydantic data contracts.
-4. SQLite schema initialization.
-5. Project status state machine.
-6. File/resource/XML security helpers.
-7. Timeline start-time assignment.
-8. Focused pytest coverage.
+1. Project docs, baseline config, and a pinned `requirements.lock.txt`.
+2. A: manual candidate selection to a project row and `source.json`.
+3. B: provider-injected scene plan generation, validation, and retry.
+4. C: `timeline.json`, placeholder/user-image slots, and text overlay PNGs.
+5. D: user image manifest with a rights and safety gate.
+6. E: narration and title generation with content-safety guards.
+7. F: self-generated local `project.kdenlive` skeleton handoff.
+8. A Streamlit local UI and dev CLIs (`smoke`, `inspect`, `generate-kdenlive`).
+9. Optional, opt-in real LLM adapters (OpenAI/Anthropic/Gemini), off by default.
+10. Focused pytest coverage, including red-team and multi-sample smoke tests.
+
+Real provider API calls, automated image insertion, TTS, upload, and final MP4
+rendering remain out of scope by design.
 
 ## Safety Rules
 
@@ -63,6 +68,22 @@ The Kdenlive file is self-generated from validated `timeline.json`,
 `d_image_manifest.json`, and `e_script.json`. It does not parse or trust
 external `.kdenlive` files, render video, run Kdenlive or melt, generate TTS, or
 upload anything. The project status remains `script_generated`.
+
+## Local UI
+
+A thin local Streamlit UI drives the manual A through F flow:
+
+```bash
+pip install -e ".[ui]"
+python -m streamlit run src/shorts_pipeline/ui/app.py
+```
+
+The UI calls only the existing phase services through a Streamlit-free
+controller (`src/shorts_pipeline/ui/controller.py`). It performs no network
+egress: B and E use the deterministic fake providers unless the explicit
+real-LLM opt-in (`SHORTS_PIPELINE_ENABLE_REAL_LLM` plus
+`SHORTS_PIPELINE_LLM_BACKEND`) is configured. It does not render video, run TTS,
+upload, or trust external `.kdenlive` files.
 
 ## Dev Smoke CLI
 
@@ -142,6 +163,13 @@ python -m pytest
 It installs only the package plus dev dependencies. It does not install LLM
 provider extras, call real APIs, scrape, render, upload, or mutate production
 Kdenlive XML.
+
+## Dependency Lock
+
+`requirements.lock.txt` pins the verified core and dev dependency closure. The
+optional `ui` and `llm` extras are intentionally not pinned there because CI
+does not install them. Regenerate a fully hashed lock with `uv pip compile` or
+`pip-compile` when available.
 
 ## Baseline Audit
 

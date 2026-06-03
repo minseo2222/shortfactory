@@ -53,6 +53,8 @@ restrictions: null
 - `gpt_pro_first_response_a_to_f.md` - historical GPT Pro review/prompt context.
 - `pyproject.toml` - package metadata, runtime dependencies, optional extras, console script,
   pytest configuration, and Ruff configuration.
+- `requirements.lock.txt` - version pins of the verified core + dev dependency closure;
+  optional `ui`/`llm` extras are intentionally unpinned.
 
 ### GitHub Workflow
 
@@ -109,6 +111,9 @@ restrictions: null
 - `src/shorts_pipeline/llm/b_provider.py` - B provider protocol only.
 - `src/shorts_pipeline/llm/e_provider.py` - E provider protocol only.
 - `src/shorts_pipeline/llm/validators.py` - LLM-shaped artifact validation helpers and D readiness helper.
+- `src/shorts_pipeline/llm/real_providers.py` - optional, opt-in real LLM adapters
+  (OpenAI/Anthropic/Gemini) loaded dynamically via importlib; disabled by default and never
+  called by tests, CI, or the default pipeline path.
 - `src/shorts_pipeline/projectgen/__init__.py` - project generation helper package marker.
 - `src/shorts_pipeline/projectgen/timeline.py` - timeline start-time assignment and B-to-timeline build helper.
 - `src/shorts_pipeline/projectgen/placeholder.py` - local Pillow placeholder PNG generation.
@@ -116,6 +121,11 @@ restrictions: null
 - `src/shorts_pipeline/projectgen/replace_images.py` - local replacement instruction Markdown generation.
 - `src/shorts_pipeline/projectgen/kdenlive.py` - standard-library XML builder for the
   self-generated F Kdenlive/MLT skeleton.
+- `src/shorts_pipeline/ui/__init__.py` - local UI package marker.
+- `src/shorts_pipeline/ui/controller.py` - Streamlit-free orchestration layer composing the
+  A->F phase services, provider selection (default fake, opt-in real), and read helpers.
+- `src/shorts_pipeline/ui/app.py` - thin Streamlit entry point rendering the local A->F flow;
+  calls only the controller and performs no network egress.
 
 ### Tests
 
@@ -134,8 +144,13 @@ restrictions: null
   retry, validators, persistence, status transition, and rollback.
 - `tests/test_f_kdenlive_project.py` - Phase F Kdenlive skeleton generation, XML/manifest
   validation, artifact hashes, safety blockers, status preservation, and rollback.
+- `tests/test_redteam_content_safety.py` - red-team coverage for the docs/06 attack
+  categories: real-name/nickname inference, crime assertion, fabricated numbers, direct
+  source/comment quotation, original-capture reuse, and mockery of individuals.
 - `tests/test_integration_smoke.py` - deterministic A to E smoke path, artifacts, DB rows,
   status history, and negative smoke behavior.
+- `tests/test_multisample_smoke.py` - twelve distinct varied-scene-plan samples through the
+  full A->F path, verifying status, scene-count match, Kdenlive profile, and no missing media.
 - `tests/test_dev_cli.py` - dev smoke CLI JSON/human output, fake-provider gate, fixed clock,
   required args, directory creation, and clean stdout.
 - `tests/test_dev_inspect_cli.py` - read-only inspect CLI, mutation checks, missing DB/root,
@@ -149,12 +164,19 @@ restrictions: null
 - `tests/test_timeline.py` - start-time accumulation and scene order coverage.
 - `tests/test_ci_workflow.py` - CI workflow trigger, dependency, action-version, pytest, Ruff,
   network/provider guard, and secret guard checks.
+- `tests/test_real_llm_providers.py` - offline unit tests for the optional real LLM adapters:
+  JSON parsing, prompt construction, opt-in resolver, SDK/key error paths, no-literal-import
+  guard discipline, and service drop-in integration with a fake completion client.
+- `tests/test_ui_controller.py` - Streamlit-free UI controller coverage: full A->F path,
+  stage-by-stage status progression, provider selection, status events, and D payload builder.
 - `tests/test_text_file_hygiene.py` - LF line-ending and hidden Unicode control checks for
   selected repo text files.
 
 ## Runtime Architecture Summary
 
-The current local backend is a file-and-SQLite pipeline. It has no product UI yet.
+The current local backend is a file-and-SQLite pipeline. A thin local Streamlit UI
+(`src/shorts_pipeline/ui/`) drives the A->F flow through a Streamlit-free controller; it is
+optional (the `ui` extra) and performs no network egress.
 
 ```text
 manual candidate
@@ -329,8 +351,9 @@ archival from `completed`.
 - Status transition: `images_inserted -> script_generated`.
 - Validation gate: D readiness helper, safe E generation context, Pydantic validation, narration
   scene order, fact-basis connection, speakability heuristic, recommended-title membership,
-  title uniqueness, numeric claim guard, hard overclaim guard, identity guard, forbidden-claims
-  categories, direct-copy check, raw-source term guard, absolute path guard, and metadata guard.
+  title uniqueness, numeric claim guard, hard overclaim guard, identity guard, mockery/hate
+  guard, forbidden-claims categories, direct-copy check, raw-source term guard, absolute path
+  guard, and metadata guard.
 - Explicit non-goals: no real provider, no network, no TTS, no voice synthesis, no rendering,
   and no upload.
 
@@ -423,8 +446,12 @@ tests. The pre-audit `main` suite had 114 tests.
   text overlay resources, deterministic frames, manual guide notes, blocked statuses,
   missing/invalid inputs, unsafe paths, forbidden XML terms, no external template use, and
   rollback.
+- `tests/test_redteam_content_safety.py` - adversarial B/E payloads for each docs/06
+  red-team category, asserting deterministic guard rejection without provider calls.
 - `tests/test_integration_smoke.py` - full A to E smoke path, optional F smoke path,
   artifact checks, and negative smoke behavior.
+- `tests/test_multisample_smoke.py` - multi-sample A->F coverage across varied scene plans,
+  asserting status, Kdenlive profile, and media-resource existence.
 - `tests/test_dev_cli.py` - smoke CLI behavior, including optional `--run-f`.
 - `tests/test_dev_inspect_cli.py` - inspect CLI behavior and read-only guarantees.
 - `tests/test_dev_cli_kdenlive.py` - Kdenlive CLI confirmation gate, JSON/human output,
@@ -434,6 +461,10 @@ tests. The pre-audit `main` suite had 114 tests.
 - `tests/test_state_machine.py` - transition rules.
 - `tests/test_timeline.py` - start-time helper.
 - `tests/test_ci_workflow.py` - CI workflow contract.
+- `tests/test_real_llm_providers.py` - optional real LLM adapter behavior, opt-in gating,
+  error paths, and import-guard discipline, all without real SDKs or network.
+- `tests/test_ui_controller.py` - UI orchestration controller: full A->F path, status
+  progression, provider selection, and D payload construction without Streamlit.
 - `tests/test_baseline_audit_doc.py` - baseline audit document structure and key claims.
 - `tests/test_text_file_hygiene.py` - LF line-ending and hidden/bidirectional Unicode control
   checks for selected repository text files.
@@ -442,8 +473,12 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Security Boundary Summary
 
-- No real LLM provider calls are implemented.
-- B and E use injected provider protocols and deterministic fake providers in tests/dev smoke only.
+- Real LLM provider adapters are opt-in and disabled by default; no real provider call is made
+  by tests, CI, or the default pipeline path.
+- Optional adapters load their SDK dynamically via importlib (no literal SDK import statements),
+  read API keys only from the environment at client-construction time, and never store keys in
+  artifacts, the DB, logs, or provider object attributes.
+- B and E default to injected provider protocols and deterministic fake providers in tests/dev smoke.
 - CI guards against direct imports of real provider/network clients in `src` and `tests`.
 - No automated crawling or scraping is implemented.
 - No full source post, full comment, raw HTML, source screenshot, API key, or secret storage is
@@ -484,8 +519,13 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Known Risks and Gaps
 
-- No real LLM provider adapter exists yet.
-- No Streamlit UI exists yet.
+- Real LLM provider adapters are opt-in and disabled by default; they have no real-SDK or
+  network coverage in CI, so provider output quality is unverified.
+- A local Streamlit UI now drives A->F, but the Streamlit rendering layer itself is verified by
+  a manual checklist rather than automated UI tests (the controller is unit tested).
+- `python-dotenv` is declared in `pyproject.toml` but is not imported by any module (config
+  reads `os.environ` directly) and is not installed in the verified environment; consider
+  wiring `.env` loading or removing the dependency.
 - No production Kdenlive project generation exists yet; Phase 6/F is a local
   self-generated editing skeleton only and still requires manual Kdenlive verification.
 - C currently generates canonical local files and PNG assets; F now generates a local
@@ -501,8 +541,10 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 ## Recommended Next Implementation Slice
 
-Add a manual Kdenlive-open verification checklist for generated `project.kdenlive` files that
-still avoids rendering, upload, TTS, and external `.kdenlive` trust.
+The local A->F product scope is implemented (UI, opt-in real adapters, red-team and
+multi-sample coverage, and a pinned `requirements.lock.txt`). The next slices are a manual
+Kdenlive-open verification pass on real hardware, a fully hashed lock via `uv`/`pip-compile`,
+and resolving the declared-but-unused `python-dotenv` dependency.
 
 ## GPT Pro Review Notes
 

@@ -100,6 +100,23 @@ METADATA_TERMS = (
     "얼굴 인식",
     "위치정보",
 )
+# Heuristic mockery/hate guard applied to titles and narration scripts only.
+# Terms are chosen to avoid substring collisions with neutral words (for
+# example, "비하" is excluded because it appears inside "준비하다").
+DEROGATORY_TERMS = (
+    "멍청",
+    "한심",
+    "찌질",
+    "병신",
+    "쓰레기 같",
+    "조롱하",
+    "혐오스",
+    "idiot",
+    "stupid",
+    "moron",
+    "pathetic",
+    "scumbag",
+)
 CLAIM_GUARD_CATEGORIES = (
     ("real names or nicknames", ("실명", "닉네임", "본명", "real name", "nickname")),
     ("personal information", ("개인정보", "personal information", "personal info")),
@@ -312,6 +329,8 @@ def _validate_title_safety(
             raise EScriptValidationError("title contains hard factual overclaims")
         if _contains_any(title, IDENTITY_TERMS):
             raise EScriptValidationError("title must not identify names or nicknames")
+        if _contains_any(title, DEROGATORY_TERMS):
+            raise EScriptValidationError("title must not mock or demean individuals")
 
 
 def _basis_is_connected(
@@ -379,6 +398,8 @@ def _validate_narration_safety(
             raise EScriptValidationError(f"{line.scene_id} narration is too long to speak")
         if _contains_any(line.script, DIRECT_SOURCE_PHRASES):
             raise EScriptValidationError("narration must not quote comments or raw source text")
+        if _contains_any(line.script, DEROGATORY_TERMS):
+            raise EScriptValidationError("narration must not mock or demean individuals")
 
 
 def validate_e_script_against_inputs(

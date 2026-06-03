@@ -41,6 +41,9 @@ exports/
 *.wav
 *.mp3
 
+# Scratch / temp files
+*.tmp
+
 # OS / editor
 .DS_Store
 Thumbs.db

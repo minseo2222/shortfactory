@@ -12,12 +12,13 @@ structured and validated before they are stored as artifacts.
 1. A: User manually creates a candidate card.
 2. A: User selects one candidate and starts a project.
 3. B: A structured `b_scene_plan.json` is generated and validated.
-4. C: The compiler generates `timeline.json`, media slots, overlay PNGs, and a
-   local Kdenlive project file.
+4. C: The compiler generates `timeline.json`, media slots, and overlay PNGs.
 5. D: User manually inserts or replaces images and records `d_image_manifest.json`.
 6. E: Narration text and title candidates are generated from the timeline and
    image manifest.
-7. User records narration and completes the final edit manually.
+7. F: A self-generated local `project.kdenlive` skeleton and handoff notes are
+   compiled from the validated C/D/E artifacts.
+8. User records narration and completes the final edit manually in Kdenlive.
 
 ## MVP Success Criteria
 
