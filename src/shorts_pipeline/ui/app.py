@@ -12,7 +12,6 @@ It does not render video, run TTS, upload, or trust external `.kdenlive` files.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import streamlit as st
@@ -122,37 +121,59 @@ def _stage_button(label: str, action) -> None:
 
 
 def _d_form(project_id: str) -> None:
-    st.subheader("D. Confirm images and rights")
+    st.subheader("D. Insert images and confirm rights")
     st.write(
-        "Replace `assets/user_images/slot_XXX.png` with your own licensed images, "
-        "then confirm rights below. Placeholders are valid PNGs you may keep for a dry run."
+        "Upload your own rights-cleared image for each scene (optional - the "
+        "generated placeholders work for a dry run), then confirm rights below."
     )
     config = _config()
-    timeline_path = config.projects_root / project_id / "timeline.json"
-    timeline = ctrl.TimelineJson.model_validate(
-        json.loads(timeline_path.read_text(encoding="utf-8"))
-    )
+    timeline = ctrl.load_timeline(config, project_id)
+    if timeline is None:
+        st.warning("Timeline not found; run C first.")
+        return
+    project_dir = config.projects_root / project_id
+
+    # Uploaders live outside the form so each image previews and stores on upload.
+    for scene in timeline.scenes:
+        uploaded = st.file_uploader(
+            f"Image for {scene.scene_id}",
+            type=["png", "jpg", "jpeg", "webp"],
+            key=f"upload_{scene.scene_id}",
+        )
+        if uploaded is not None:
+            try:
+                ctrl.store_user_image(
+                    config, project_id, scene.image_path, uploaded.getvalue(),
+                    filename=uploaded.name,
+                )
+                st.caption(f"Stored `{uploaded.name}` into `{scene.image_path}`")
+            except Exception as exc:
+                st.error(f"Image for {scene.scene_id} rejected: {exc}")
+        abs_path = project_dir / ensure_relative_project_path(scene.image_path)
+        if abs_path.is_file():
+            st.image(str(abs_path), width=160, caption=scene.scene_id)
+
     with st.form("d_confirm"):
-        slot_inputs: dict[str, dict[str, object]] = {}
         all_rights = st.checkbox(
             "I confirm I hold rights for every image", value=True, key="d_all_rights"
         )
-        for scene in timeline.scenes:
-            st.markdown(f"**{scene.scene_id}** - `{scene.image_path}`")
-            note = st.text_input(
-                f"Note for {scene.scene_id}",
-                value=f"User-owned safe image for {scene.scene_id}.",
-                key=f"note_{scene.scene_id}",
-            )
-            slot_inputs[scene.scene_id] = {
-                "actual_image_note": note,
-                "rights_confirmed_by_user": all_rights,
-            }
+        no_capture = st.checkbox(
+            "None of these are screenshots/captures of the original source",
+            value=True,
+            key="d_no_capture",
+        )
         submitted = st.form_submit_button("Confirm D")
     if submitted:
         try:
             if ctrl.current_status(config, project_id) == "project_generated":
                 ctrl.init_d(config, project_id)
+            slot_inputs = {
+                scene.scene_id: {
+                    "rights_confirmed_by_user": all_rights,
+                    "contains_original_capture": not no_capture,
+                }
+                for scene in timeline.scenes
+            }
             payload = ctrl.build_ready_d_payload(timeline, slot_inputs=slot_inputs)
             ctrl.confirm_d(config, project_id, payload)
             st.success("D confirmed")

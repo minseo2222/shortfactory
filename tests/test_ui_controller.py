@@ -12,6 +12,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 from shorts_pipeline.dev_fakes import DevFakeBProvider, DevFakeEProvider
 from shorts_pipeline.llm.real_providers import RealBScenePlanProvider, RealEScriptProvider
 from shorts_pipeline.models import EScript, FKdenliveManifest
@@ -173,6 +175,61 @@ def test_artifact_loaders_return_none_then_value(tmp_path) -> None:
     timeline = ctrl.load_timeline(config, pid)
     assert timeline is not None and len(timeline.scenes) == len(plan.scene_plan)
     assert ctrl.load_e_script(config, pid) is None  # not generated yet
+
+
+_PNG_BYTES = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01"
+    b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+def _project_with_timeline(tmp_path):
+    config = make_config(tmp_path)
+    project = ctrl.create_project(config, candidate(), clock=fixed_clock)
+    ctrl.run_b(config, project.project_id, clock=fixed_clock)
+    timeline = ctrl.run_c(config, project.project_id, clock=fixed_clock)
+    return config, project.project_id, timeline
+
+
+def test_store_user_image_writes_valid_png(tmp_path) -> None:
+    config, pid, timeline = _project_with_timeline(tmp_path)
+    slot_path = timeline.scenes[0].image_path
+    rel = ctrl.store_user_image(config, pid, slot_path, _PNG_BYTES, filename="my_photo.png")
+    assert rel == slot_path
+    written = config.projects_root / pid / rel
+    assert written.read_bytes() == _PNG_BYTES
+
+
+def test_store_user_image_rejects_bad_extension(tmp_path) -> None:
+    config, pid, timeline = _project_with_timeline(tmp_path)
+    with pytest.raises(ctrl.UserImageError):
+        ctrl.store_user_image(
+            config, pid, timeline.scenes[0].image_path, _PNG_BYTES, filename="evil.exe"
+        )
+
+
+def test_store_user_image_rejects_oversize(tmp_path, monkeypatch) -> None:
+    config, pid, timeline = _project_with_timeline(tmp_path)
+    monkeypatch.setattr(ctrl, "MAX_USER_IMAGE_BYTES", 4)
+    with pytest.raises(ctrl.UserImageError):
+        ctrl.store_user_image(
+            config, pid, timeline.scenes[0].image_path, b"12345", filename="big.png"
+        )
+
+
+def test_store_user_image_rejects_empty(tmp_path) -> None:
+    config, pid, timeline = _project_with_timeline(tmp_path)
+    with pytest.raises(ctrl.UserImageError):
+        ctrl.store_user_image(
+            config, pid, timeline.scenes[0].image_path, b"", filename="empty.png"
+        )
+
+
+def test_store_user_image_rejects_path_traversal(tmp_path) -> None:
+    config, pid, _ = _project_with_timeline(tmp_path)
+    with pytest.raises(ctrl.UserImageError):
+        ctrl.store_user_image(config, pid, "../escape.png", _PNG_BYTES, filename="ok.png")
 
 
 def test_build_ready_d_payload_applies_overrides(tmp_path) -> None:

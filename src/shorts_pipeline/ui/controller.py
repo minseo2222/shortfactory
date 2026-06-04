@@ -36,8 +36,19 @@ from shorts_pipeline.models import (
     TimelineJson,
 )
 from shorts_pipeline.project_service import create_project_from_candidate
+from shorts_pipeline.security import (
+    ensure_path_under_root,
+    ensure_relative_project_path,
+    validate_media_extension,
+)
 
 Clock = Callable[[], datetime] | None
+
+MAX_USER_IMAGE_BYTES = 20 * 1024 * 1024
+
+
+class UserImageError(ValueError):
+    """Raised when an uploaded user image fails local safety validation."""
 
 
 @dataclass(frozen=True)
@@ -196,6 +207,37 @@ def load_e_script(config: PipelineConfig, project_id: str) -> EScript | None:
 
 def load_f_manifest(config: PipelineConfig, project_id: str) -> FKdenliveManifest | None:
     return _load_artifact(config, project_id, "f_kdenlive_manifest.json", FKdenliveManifest)
+
+
+def store_user_image(
+    config: PipelineConfig,
+    project_id: str,
+    relative_image_path: str,
+    data: bytes,
+    *,
+    filename: str,
+) -> str:
+    """Validate an uploaded image and write it into the project's slot path.
+
+    Local-only: rejects unsupported extensions, oversized files, empty data,
+    and any path escaping the project directory. No external fetch occurs; the
+    bytes come from the user's own upload. Returns the stored relative path.
+    """
+    if not data:
+        raise UserImageError("uploaded file is empty")
+    if len(data) > MAX_USER_IMAGE_BYTES:
+        limit_mb = MAX_USER_IMAGE_BYTES // (1024 * 1024)
+        raise UserImageError(f"image exceeds the {limit_mb} MB limit")
+    try:
+        validate_media_extension(filename)
+        safe_relative = ensure_relative_project_path(relative_image_path)
+        project_dir = Path(config.projects_root) / project_id
+        target = ensure_path_under_root(project_dir, project_dir / safe_relative)
+    except ValueError as exc:
+        raise UserImageError(str(exc)) from exc
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(data)
+    return safe_relative.as_posix()
 
 
 # --- D image manifest payload construction ----------------------------------
