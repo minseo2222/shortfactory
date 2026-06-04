@@ -12,6 +12,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 from shorts_pipeline.dev_fakes import DevFakeBProvider, DevFakeEProvider
 from shorts_pipeline.llm.real_providers import RealBScenePlanProvider, RealEScriptProvider
 from shorts_pipeline.models import EScript, FKdenliveManifest
@@ -108,6 +110,159 @@ def test_provider_mode_real_when_opted_in(monkeypatch) -> None:
     # Construction is lazy; selecting a real provider must not require an SDK.
     assert isinstance(ctrl.select_b_provider(), RealBScenePlanProvider)
     assert isinstance(ctrl.select_e_provider(), RealEScriptProvider)
+
+
+def _clear_llm_env(monkeypatch) -> None:
+    for name in (
+        "SHORTS_PIPELINE_ENABLE_REAL_LLM",
+        "SHORTS_PIPELINE_LLM_BACKEND",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_readiness_fake_when_unconfigured(monkeypatch) -> None:
+    _clear_llm_env(monkeypatch)
+    info = ctrl.readiness()
+    assert info["mode"] == "fake"
+    assert info["ready"] is False
+    assert info["key_present"] is False
+    # The enable flag name must be surfaced as actionable guidance.
+    assert any("SHORTS_PIPELINE_ENABLE_REAL_LLM" in item for item in info["missing"])
+
+
+def test_readiness_real_selected_but_missing_key(monkeypatch) -> None:
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("SHORTS_PIPELINE_ENABLE_REAL_LLM", "1")
+    monkeypatch.setenv("SHORTS_PIPELINE_LLM_BACKEND", "anthropic")
+    info = ctrl.readiness()
+    assert info["mode"] == "real:anthropic"  # attempted...
+    assert info["ready"] is False  # ...but not fully configured
+    assert any("ANTHROPIC_API_KEY" in item for item in info["missing"])
+
+
+def test_readiness_ready_with_key_never_leaks_value(monkeypatch) -> None:
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("SHORTS_PIPELINE_ENABLE_REAL_LLM", "1")
+    monkeypatch.setenv("SHORTS_PIPELINE_LLM_BACKEND", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-super-secret-value")
+    info = ctrl.readiness()
+    assert info["ready"] is True
+    assert info["key_present"] is True
+    assert info["missing"] == []
+    # The secret value must never appear anywhere in the readiness summary.
+    assert "sk-super-secret-value" not in repr(info)
+
+
+def test_artifact_loaders_return_none_then_value(tmp_path) -> None:
+    config = make_config(tmp_path)
+    project = ctrl.create_project(config, candidate(), clock=fixed_clock)
+    pid = project.project_id
+
+    assert ctrl.load_b_plan(config, pid) is None
+    assert ctrl.load_timeline(config, pid) is None
+    assert ctrl.load_e_script(config, pid) is None
+    assert ctrl.load_f_manifest(config, pid) is None
+
+    ctrl.run_b(config, pid, clock=fixed_clock)
+    plan = ctrl.load_b_plan(config, pid)
+    assert plan is not None and len(plan.scene_plan) >= 1
+
+    ctrl.run_c(config, pid, clock=fixed_clock)
+    timeline = ctrl.load_timeline(config, pid)
+    assert timeline is not None and len(timeline.scenes) == len(plan.scene_plan)
+    assert ctrl.load_e_script(config, pid) is None  # not generated yet
+
+
+_PNG_BYTES = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01"
+    b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+def _project_with_timeline(tmp_path):
+    config = make_config(tmp_path)
+    project = ctrl.create_project(config, candidate(), clock=fixed_clock)
+    ctrl.run_b(config, project.project_id, clock=fixed_clock)
+    timeline = ctrl.run_c(config, project.project_id, clock=fixed_clock)
+    return config, project.project_id, timeline
+
+
+def test_store_user_image_writes_valid_png(tmp_path) -> None:
+    config, pid, timeline = _project_with_timeline(tmp_path)
+    slot_path = timeline.scenes[0].image_path
+    rel = ctrl.store_user_image(config, pid, slot_path, _PNG_BYTES, filename="my_photo.png")
+    assert rel == slot_path
+    written = config.projects_root / pid / rel
+    assert written.read_bytes() == _PNG_BYTES
+
+
+def test_store_user_image_rejects_bad_extension(tmp_path) -> None:
+    config, pid, timeline = _project_with_timeline(tmp_path)
+    with pytest.raises(ctrl.UserImageError):
+        ctrl.store_user_image(
+            config, pid, timeline.scenes[0].image_path, _PNG_BYTES, filename="evil.exe"
+        )
+
+
+def test_store_user_image_rejects_oversize(tmp_path, monkeypatch) -> None:
+    config, pid, timeline = _project_with_timeline(tmp_path)
+    monkeypatch.setattr(ctrl, "MAX_USER_IMAGE_BYTES", 4)
+    with pytest.raises(ctrl.UserImageError):
+        ctrl.store_user_image(
+            config, pid, timeline.scenes[0].image_path, b"12345", filename="big.png"
+        )
+
+
+def test_store_user_image_rejects_empty(tmp_path) -> None:
+    config, pid, timeline = _project_with_timeline(tmp_path)
+    with pytest.raises(ctrl.UserImageError):
+        ctrl.store_user_image(
+            config, pid, timeline.scenes[0].image_path, b"", filename="empty.png"
+        )
+
+
+def test_store_user_image_rejects_path_traversal(tmp_path) -> None:
+    config, pid, _ = _project_with_timeline(tmp_path)
+    with pytest.raises(ctrl.UserImageError):
+        ctrl.store_user_image(config, pid, "../escape.png", _PNG_BYTES, filename="ok.png")
+
+
+def test_list_projects_newest_first(tmp_path) -> None:
+    config = make_config(tmp_path)
+    assert ctrl.list_projects(config) == []  # no DB yet
+
+    older = ctrl.create_project(config, candidate(), clock=lambda: datetime(2026, 6, 4, 9, 0, 0))
+    newer = ctrl.create_project(config, candidate(), clock=lambda: datetime(2026, 6, 4, 10, 0, 0))
+
+    summaries = ctrl.list_projects(config)
+    ids = [s.project_id for s in summaries]
+    assert older.project_id in ids and newer.project_id in ids
+    assert ids[0] == newer.project_id  # newest first
+    assert all(s.status for s in summaries)
+    assert all(s.title for s in summaries)
+
+
+def test_load_candidate_roundtrip(tmp_path) -> None:
+    config = make_config(tmp_path)
+    project = ctrl.create_project(config, candidate(), clock=fixed_clock)
+    cand = ctrl.load_candidate(config, project.project_id)
+    assert cand is not None
+    assert cand["title"] and cand["summary"] and cand["hook"] and cand["why_shortable"]
+    assert cand["source_url"]
+    assert ctrl.load_candidate(config, "PRJ_99999999_9999") is None
+
+
+def test_regenerate_draft_creates_distinct_completed_project(tmp_path) -> None:
+    config = make_config(tmp_path)
+    first = ctrl.create_project(config, candidate(), clock=lambda: datetime(2026, 6, 4, 9, 0, 0))
+    new_id = ctrl.regenerate_draft(config, first.project_id, clock=lambda: datetime(2026, 6, 4, 10))
+    assert new_id != first.project_id
+    assert ctrl.current_status(config, new_id) == "script_generated"
 
 
 def test_build_ready_d_payload_applies_overrides(tmp_path) -> None:

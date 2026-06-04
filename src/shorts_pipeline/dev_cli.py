@@ -185,6 +185,21 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print only the run summary JSON object to stdout.",
     )
+
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Report local readiness: provider opt-in and optional dependencies.",
+    )
+    doctor_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print only the readiness JSON object to stdout.",
+    )
+    doctor_parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit non-zero when the real LLM is not fully configured.",
+    )
     return parser
 
 
@@ -420,6 +435,54 @@ def _run_pipeline_command(args: argparse.Namespace) -> int:
     return SUCCESS
 
 
+def _run_doctor_command(args: argparse.Namespace) -> int:
+    import importlib.util
+
+    from shorts_pipeline.llm.real_providers import provider_readiness
+
+    def _is_installed(module_name: str) -> bool:
+        # find_spec raises ModuleNotFoundError when a parent package (e.g.
+        # "google") is absent, rather than returning None; treat that as missing.
+        try:
+            return importlib.util.find_spec(module_name) is not None
+        except ModuleNotFoundError:
+            return False
+
+    info = provider_readiness()  # secret-free: presence and env var names only
+    optional_deps = {
+        name: _is_installed(name)
+        for name in ("streamlit", "openai", "anthropic", "google.generativeai")
+    }
+    summary = {
+        "provider_mode": info["mode"],
+        "real_ready": info["ready"],
+        "real_enabled": info["real_enabled"],
+        "backend": info["backend"],
+        "key_present": info["key_present"],
+        "missing": info["missing"],
+        "optional_deps_installed": optional_deps,
+    }
+    if args.json:
+        print(json.dumps(summary, indent=2, ensure_ascii=False))
+    else:
+        print("Shorts Pipeline readiness (no secret values are shown)")
+        print(f"Provider mode: {summary['provider_mode']}")
+        print(f"Real LLM ready: {summary['real_ready']}")
+        print(f"API key present: {summary['key_present']}")
+        if summary["missing"]:
+            print("To enable the real LLM:")
+            for item in summary["missing"]:
+                print(f"  - {item}")
+        print("Optional dependencies:")
+        for name, installed in optional_deps.items():
+            print(f"  - {name}: {'installed' if installed else 'missing'}")
+
+    if args.strict and not info["ready"]:
+        print("strict doctor: real LLM is not fully configured", file=sys.stderr)
+        return RUNTIME_ERROR
+    return SUCCESS
+
+
 def _run_inspect_command(args: argparse.Namespace) -> int:
     db_path = _resolve_cli_path(args.db_path)
     projects_root = _resolve_cli_path(args.projects_root)
@@ -460,6 +523,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_smoke_command(args)
         if args.command == "run":
             return _run_pipeline_command(args)
+        if args.command == "doctor":
+            return _run_doctor_command(args)
         if args.command == "inspect":
             return _run_inspect_command(args)
         if args.command == "generate-kdenlive":

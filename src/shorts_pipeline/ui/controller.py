@@ -22,22 +22,34 @@ from shorts_pipeline.dev_fakes import DevFakeBProvider, DevFakeEProvider
 from shorts_pipeline.e_service import generate_e_script
 from shorts_pipeline.f_service import generate_f_kdenlive_project
 from shorts_pipeline.llm.real_providers import (
-    real_llm_enabled,
+    provider_readiness,
     resolve_b_provider,
     resolve_e_provider,
-    selected_backend,
 )
 from shorts_pipeline.models import (
     BScenePlan,
     DImageManifest,
+    EScript,
     FKdenliveManifest,
     Project,
     ProjectStatusEvent,
+    SourceArtifact,
     TimelineJson,
 )
 from shorts_pipeline.project_service import create_project_from_candidate
+from shorts_pipeline.security import (
+    ensure_path_under_root,
+    ensure_relative_project_path,
+    validate_media_extension,
+)
 
 Clock = Callable[[], datetime] | None
+
+MAX_USER_IMAGE_BYTES = 20 * 1024 * 1024
+
+
+class UserImageError(ValueError):
+    """Raised when an uploaded user image fails local safety validation."""
 
 
 @dataclass(frozen=True)
@@ -61,10 +73,12 @@ class PipelineConfig:
 
 def provider_mode() -> str:
     """Return a short human-readable label for the active provider mode."""
-    backend = selected_backend()
-    if real_llm_enabled() and backend:
-        return f"real:{backend}"
-    return "fake"
+    return provider_readiness()["mode"]
+
+
+def readiness() -> dict:
+    """Secret-free real-LLM readiness summary for the UI provider panel."""
+    return provider_readiness()
 
 
 def select_b_provider():
@@ -166,6 +180,135 @@ def current_status(config: PipelineConfig, project_id: str) -> str | None:
 
 def status_events(config: PipelineConfig, project_id: str) -> list[ProjectStatusEvent]:
     return list_project_status_events(config.db_path, project_id)
+
+
+@dataclass(frozen=True)
+class ProjectSummary:
+    project_id: str
+    title: str
+    status: str
+    created_at: str
+
+
+def list_projects(config: PipelineConfig) -> list[ProjectSummary]:
+    """Return all stored projects (newest first) for the resume picker.
+
+    Read-only: opens the DB read-only and returns an empty list when no DB
+    exists yet.
+    """
+    if not Path(config.db_path).exists():
+        return []
+    conn = connect_readonly_db(config.db_path)
+    try:
+        rows = conn.execute(
+            "SELECT id, source_title, status, created_at FROM projects "
+            "ORDER BY created_at DESC, id DESC"
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        ProjectSummary(
+            project_id=row[0], title=row[1] or "", status=row[2], created_at=row[3]
+        )
+        for row in rows
+    ]
+
+
+def _load_artifact(config: PipelineConfig, project_id: str, filename: str, model):
+    """Load and validate one stored JSON artifact, or return None if absent.
+
+    Read-only. A missing file yields None; a present-but-invalid file raises so
+    the corruption surfaces rather than being silently hidden.
+    """
+    path = config.projects_root / project_id / filename
+    if not path.exists():
+        return None
+    return model.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def load_b_plan(config: PipelineConfig, project_id: str) -> BScenePlan | None:
+    return _load_artifact(config, project_id, "b_scene_plan.json", BScenePlan)
+
+
+def load_timeline(config: PipelineConfig, project_id: str) -> TimelineJson | None:
+    return _load_artifact(config, project_id, "timeline.json", TimelineJson)
+
+
+def load_e_script(config: PipelineConfig, project_id: str) -> EScript | None:
+    return _load_artifact(config, project_id, "e_script.json", EScript)
+
+
+def load_f_manifest(config: PipelineConfig, project_id: str) -> FKdenliveManifest | None:
+    return _load_artifact(config, project_id, "f_kdenlive_manifest.json", FKdenliveManifest)
+
+
+def load_candidate(config: PipelineConfig, project_id: str) -> dict[str, Any] | None:
+    """Reconstruct an editable candidate dict from the stored source.json.
+
+    Read-only. Returns None when the project's source artifact is absent. Used
+    to re-edit or regenerate from the same source without re-typing.
+    """
+    source = _load_artifact(config, project_id, "source.json", SourceArtifact)
+    if source is None:
+        return None
+    return {
+        "candidate_id": f"regen-{project_id}",
+        "title": source.source_title,
+        "source_url": str(source.source_url),
+        "community": source.source_community,
+        "collected_at": source.created_at,
+        "summary": source.user_or_llm_summary,
+        "hook": source.hook,
+        "why_shortable": source.why_shortable,
+        "risk_flags_for_user": list(source.risk_flags_for_user),
+        "status": "selected",
+    }
+
+
+def regenerate_draft(config: PipelineConfig, project_id: str, *, clock: Clock = None) -> str:
+    """Create a NEW project from the same candidate and run A->F again.
+
+    In-place stage re-runs are intentionally not offered (the phase services
+    enforce forward-only preconditions). Regenerating as a fresh project is the
+    safe, state-machine-respecting way to get a new draft (a real LLM yields a
+    different take). Returns the new project id.
+    """
+    candidate = load_candidate(config, project_id)
+    if candidate is None:
+        raise ValueError(f"no stored candidate for project {project_id}")
+    result = run_full_pipeline(config, candidate, clock=clock)
+    return result["project_id"]
+
+
+def store_user_image(
+    config: PipelineConfig,
+    project_id: str,
+    relative_image_path: str,
+    data: bytes,
+    *,
+    filename: str,
+) -> str:
+    """Validate an uploaded image and write it into the project's slot path.
+
+    Local-only: rejects unsupported extensions, oversized files, empty data,
+    and any path escaping the project directory. No external fetch occurs; the
+    bytes come from the user's own upload. Returns the stored relative path.
+    """
+    if not data:
+        raise UserImageError("uploaded file is empty")
+    if len(data) > MAX_USER_IMAGE_BYTES:
+        limit_mb = MAX_USER_IMAGE_BYTES // (1024 * 1024)
+        raise UserImageError(f"image exceeds the {limit_mb} MB limit")
+    try:
+        validate_media_extension(filename)
+        safe_relative = ensure_relative_project_path(relative_image_path)
+        project_dir = Path(config.projects_root) / project_id
+        target = ensure_path_under_root(project_dir, project_dir / safe_relative)
+    except ValueError as exc:
+        raise UserImageError(str(exc)) from exc
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(data)
+    return safe_relative.as_posix()
 
 
 # --- D image manifest payload construction ----------------------------------

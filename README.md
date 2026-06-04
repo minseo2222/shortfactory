@@ -85,6 +85,12 @@ real-LLM opt-in (`SHORTS_PIPELINE_ENABLE_REAL_LLM` plus
 `SHORTS_PIPELINE_LLM_BACKEND`) is configured. It does not render video, run TTS,
 upload, or trust external `.kdenlive` files.
 
+The candidate form offers a one-click **Generate full draft (A->F)** button
+(placeholder images, no rendering or upload) alongside the step-by-step stage
+buttons. The sidebar shows a real-LLM readiness panel: the active provider mode
+and, when the real LLM is not fully configured, exactly which environment
+variables to set. It reports only the presence of an API key, never its value.
+
 ## Run the Pipeline (real LLM or fake)
 
 The `run` command drives one candidate through the pipeline from a single
@@ -114,6 +120,12 @@ sample. For an offline dry run, replace the real-LLM opt-in with
 `--use-fake-providers`. The command refuses to run unless a provider mode is
 chosen explicitly — it never silently falls back to fakes when you intend real.
 Real provider calls happen only when you have opted in and supplied keys.
+
+Check your setup first with the readiness report (it never prints key values):
+
+```bash
+python -m shorts_pipeline.dev_cli doctor --json
+```
 
 After a completed run, open the project folder, replace the placeholder images
 under `assets/user_images/` with your rights-cleared images, and open
