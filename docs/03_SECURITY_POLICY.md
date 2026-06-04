@@ -7,10 +7,17 @@ Project files are generated only under the configured project root.
 Forbidden:
 
 - Absolute path resources.
-- `../` path traversal.
+- `../` path traversal (including Windows-style `..\\` that is invisible to a
+  POSIX path parser).
+- Drive-letter (`C:...`) and UNC (`\\\\server\\share`) paths.
 - External URL resources.
 - External `.kdenlive` inputs.
 - Text insertion into XML without escaping.
+
+Path validation is platform-independent: `ensure_relative_project_path`
+normalizes backslashes and analyses the path with POSIX semantics, and the
+SQLite `project_dir`/`relative_path` CHECK constraints reject backslashes and
+drive-letter prefixes, so the same paths are blocked on Linux (CI) and Windows.
 
 Allowed media extensions:
 

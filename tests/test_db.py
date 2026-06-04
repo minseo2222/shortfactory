@@ -48,3 +48,29 @@ def test_invalid_project_status_rejected_by_check_constraint(tmp_path) -> None:
                 now,
             ),
         )
+
+
+@pytest.mark.parametrize("unsafe_dir", ["C:foo", "..\\evil", "evil\\sub", "/abs"])
+def test_unsafe_project_dir_rejected_by_check_constraint(tmp_path, unsafe_dir) -> None:
+    conn = connect_db(tmp_path / "shorts.sqlite3")
+    init_db(conn)
+    now = now_kst_iso()
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            """
+            INSERT INTO projects (
+                id, project_dir, source_url, source_title, community, status,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "PRJ_20260101_0001",
+                unsafe_dir,
+                "https://example.com/post/1",
+                "Example",
+                "example",
+                "candidate_selected",
+                now,
+                now,
+            ),
+        )

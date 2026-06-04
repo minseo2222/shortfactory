@@ -66,6 +66,8 @@ def init_db(conn: sqlite3.Connection) -> None:
             CHECK (project_dir NOT LIKE '../%'),
             CHECK (project_dir NOT LIKE '%/../%'),
             CHECK (project_dir NOT LIKE '/%'),
+            CHECK (project_dir NOT LIKE '%\\%'),
+            CHECK (project_dir NOT LIKE '_:%'),
             CHECK (project_dir NOT LIKE 'http://%'),
             CHECK (project_dir NOT LIKE 'https://%')
         );
@@ -115,6 +117,8 @@ def init_db(conn: sqlite3.Connection) -> None:
             CHECK (relative_path NOT LIKE '../%'),
             CHECK (relative_path NOT LIKE '%/../%'),
             CHECK (relative_path NOT LIKE '/%'),
+            CHECK (relative_path NOT LIKE '%\\%'),
+            CHECK (relative_path NOT LIKE '_:%'),
             CHECK (relative_path NOT LIKE 'http://%'),
             CHECK (relative_path NOT LIKE 'https://%')
         );
