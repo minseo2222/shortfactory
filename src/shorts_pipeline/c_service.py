@@ -253,7 +253,16 @@ def _generate_c_files(project_dir: Path, timeline: TimelineJson) -> list[Path]:
             image_slot_description=scene.image_slot_description,
             avoid_claims=scene.avoid_claims,
         )
-        shutil.copyfile(placeholder_path, user_image_path)
+        # Seed the user-image slot with a copy of the placeholder, but never
+        # clobber a user-replaced image. C is `planned`-only so this normally
+        # runs once; the guard makes a re-run safe (an existing slot file that
+        # differs from the placeholder is treated as a user replacement and is
+        # preserved).
+        if (
+            not user_image_path.exists()
+            or user_image_path.read_bytes() == placeholder_path.read_bytes()
+        ):
+            shutil.copyfile(placeholder_path, user_image_path)
         create_text_overlay_png(scene.screen_text, overlay_path, canvas)
         generated.extend([placeholder_path, user_image_path, overlay_path])
 

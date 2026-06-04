@@ -12,7 +12,8 @@ Forbidden:
 - Drive-letter (`C:...`) and UNC (`\\\\server\\share`) paths.
 - External URL resources.
 - External `.kdenlive` inputs.
-- Text insertion into XML without escaping.
+- Unescaped text in generated XML (the F builder uses `xml.etree.ElementTree`,
+  which auto-escapes element text and attributes on write).
 
 Path validation is platform-independent: `ensure_relative_project_path`
 normalizes backslashes and analyses the path with POSIX semantics, and the

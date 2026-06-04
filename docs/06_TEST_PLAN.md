@@ -25,7 +25,6 @@
 - State transition validation.
 - Safe path validation.
 - External URL resource rejection.
-- XML escaping helper.
 
 ## DB Tests
 
@@ -63,7 +62,7 @@
 - `../evil.png` is rejected.
 - `/absolute/path.png` is rejected.
 - `https://example.com/a.png` is rejected as a media resource.
-- XML special characters are escaped.
+- Backslash/drive/UNC paths are rejected platform-independently.
 - `.env` is not read into logs.
 
 ## Integration Tests
@@ -101,7 +100,9 @@
   D payload construction without importing Streamlit.
 - A headless Streamlit `AppTest` smoke drives `app.py` itself through A->F
   (skipped when the `ui` extra is absent), so the rendering layer is exercised,
-  not just the controller.
+  not just the controller. Error paths are covered too: a create failure and a
+  forced stage failure render `st.error` without raising, and an unknown project
+  renders the no-action info branch.
 - Multi-sample smoke tests run twelve distinct synthetic candidates with varied
   valid scene plans (4-6 scenes, different styles and durations) through the full
   A->F path, asserting `script_generated` status, timeline/narration scene-count
