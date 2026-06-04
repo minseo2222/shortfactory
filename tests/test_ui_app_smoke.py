@@ -83,3 +83,34 @@ def test_ui_app_drives_full_a_to_f(tmp_path) -> None:
     at_final = _fresh(tmp_path, project_id)
     shown = " ".join(block.value for block in at_final.code)
     assert "project.kdenlive" in shown
+
+
+# --- Error-path coverage (W3) ----------------------------------------------
+
+
+def _raise(*_args, **_kwargs):
+    raise RuntimeError("forced failure")
+
+
+def test_ui_unknown_project_renders_info_without_crash(tmp_path) -> None:
+    at = _fresh(tmp_path, project_id="PRJ_20260101_9999")
+    assert not at.exception
+    # No status -> the app shows an informational message, not a crash.
+    assert any("No UI action" in block.value for block in at.info)
+
+
+def test_ui_create_failure_renders_error(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(ctrl, "create_project", _raise)
+    at = _click(_fresh(tmp_path), "Create project")
+    assert not at.exception
+    assert any("Create failed" in block.value for block in at.error)
+
+
+def test_ui_stage_failure_renders_error(tmp_path, monkeypatch) -> None:
+    # Create a real project first, then force the B stage to fail.
+    at = _click(_fresh(tmp_path), "Create project")
+    project_id = at.session_state["project_id"]
+    monkeypatch.setattr(ctrl, "run_b", _raise)
+    at = _click(_fresh(tmp_path, project_id), "scene plan (B)")
+    assert not at.exception
+    assert any("failed" in block.value for block in at.error)
