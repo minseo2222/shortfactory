@@ -147,14 +147,6 @@ def init_db(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
-            event_type TEXT NOT NULL,
-            message TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        );
-
         CREATE TABLE IF NOT EXISTS project_status_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
