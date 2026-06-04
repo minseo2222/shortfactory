@@ -9,6 +9,7 @@ handling are all verified deterministically.
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -369,3 +370,69 @@ def test_non_transient_error_propagates_unchanged() -> None:
 
     with pytest.raises(ValueError):
         rp._run_sdk_call(fail, attempts=2)
+
+
+# --- Real adapter correction loop through the service (W4) ------------------
+
+
+class SequencedClient:
+    """Returns a sequence of responses across calls (last repeats)."""
+
+    def __init__(self, responses: list[str]) -> None:
+        self.responses = responses
+        self.calls = 0
+        self.last_user: str | None = None
+
+    def complete_json(self, *, system: str, user: str) -> str:
+        self.last_user = user
+        index = min(self.calls, len(self.responses) - 1)
+        self.calls += 1
+        return self.responses[index]
+
+
+def test_real_b_provider_corrects_through_service_retry(tmp_path) -> None:
+    db_path = tmp_path / "shorts.sqlite3"
+    projects_root = tmp_path / "projects"
+    candidate = json.loads((FIXTURES / "sample_source.json").read_text(encoding="utf-8"))
+    project = create_project_from_candidate(
+        candidate, db_path=db_path, projects_root=projects_root, clock=fixed_clock
+    )
+    # First response is schema-invalid (missing required fields); second is valid.
+    invalid = json.dumps({"schema_version": "b_scene_plan.v2.1"})
+    client = SequencedClient([invalid, valid_b_json()])
+    provider = rp.build_b_provider("openai", client=client)
+
+    plan = generate_b_scene_plan(
+        project.project_id,
+        db_path=db_path,
+        projects_root=projects_root,
+        provider=provider,
+        clock=fixed_clock,
+    )
+
+    assert isinstance(plan, BScenePlan)
+    assert client.calls == 2  # corrected on the second attempt
+    assert (projects_root / project.project_id / "b_scene_plan.json").is_file()
+    # The retry prompt fed the previous validation error back to the adapter.
+    assert "validation" in (client.last_user or "").lower() or "scene_plan" in (
+        client.last_user or ""
+    )
+
+
+@pytest.mark.skipif(
+    os.environ.get("SHORTS_PIPELINE_LIVE_LLM_TEST") != "1",
+    reason="live LLM E2E is opt-in (set SHORTS_PIPELINE_LIVE_LLM_TEST=1 with a real key)",
+)
+def test_live_b_provider_end_to_end(tmp_path) -> None:  # pragma: no cover - opt-in only
+    backend = rp.selected_backend() or "openai"
+    provider = rp.build_b_provider(backend)  # real SDK, real network
+    db_path = tmp_path / "shorts.sqlite3"
+    projects_root = tmp_path / "projects"
+    candidate = json.loads((FIXTURES / "sample_source.json").read_text(encoding="utf-8"))
+    project = create_project_from_candidate(
+        candidate, db_path=db_path, projects_root=projects_root
+    )
+    plan = generate_b_scene_plan(
+        project.project_id, db_path=db_path, projects_root=projects_root, provider=provider
+    )
+    assert isinstance(plan, BScenePlan)
