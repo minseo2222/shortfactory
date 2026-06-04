@@ -440,9 +440,17 @@ def _run_doctor_command(args: argparse.Namespace) -> int:
 
     from shorts_pipeline.llm.real_providers import provider_readiness
 
+    def _is_installed(module_name: str) -> bool:
+        # find_spec raises ModuleNotFoundError when a parent package (e.g.
+        # "google") is absent, rather than returning None; treat that as missing.
+        try:
+            return importlib.util.find_spec(module_name) is not None
+        except ModuleNotFoundError:
+            return False
+
     info = provider_readiness()  # secret-free: presence and env var names only
     optional_deps = {
-        name: importlib.util.find_spec(name) is not None
+        name: _is_installed(name)
         for name in ("streamlit", "openai", "anthropic", "google.generativeai")
     }
     summary = {
