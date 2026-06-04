@@ -194,6 +194,21 @@ def test_ui_edit_candidate_returns_to_prefilled_form(tmp_path) -> None:
     assert at.session_state["edit_candidate"]["title"]  # candidate stashed for editing
 
 
+def test_ui_first_run_help_and_stage_hint(tmp_path) -> None:
+    # First run (no projects): the how-it-works help is shown.
+    at = _fresh(tmp_path)
+    assert not at.exception
+    help_text = " ".join(block.value for block in at.markdown)
+    assert "How this works" in help_text or "finish in Kdenlive" in help_text
+
+    # After creating a project, a per-stage "Next:" hint appears.
+    at = _click(_fresh(tmp_path), "Create project")
+    project_id = at.session_state["project_id"]
+    at = _fresh(tmp_path, project_id)
+    assert not at.exception
+    assert any("Next:" in block.value for block in at.info)
+
+
 def test_ui_provider_panel_shows_enable_guidance(tmp_path, monkeypatch) -> None:
     for name in (
         "SHORTS_PIPELINE_ENABLE_REAL_LLM",

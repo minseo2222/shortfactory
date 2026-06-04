@@ -105,8 +105,9 @@ restrictions: null
 - `src/shorts_pipeline/smoke.py` - deterministic local A to E integration smoke runner
   with optional F handoff verification.
 - `src/shorts_pipeline/dev_cli.py` - dev-only `smoke`, read-only `inspect`,
-  local-write `generate-kdenlive`, and `run` (A->C or full A->F with
-  `--accept-placeholders`, opt-in real LLM or fake) CLI commands.
+  local-write `generate-kdenlive`, `run` (A->C or full A->F with
+  `--accept-placeholders`, opt-in real LLM or fake), and `doctor` (secret-free
+  readiness report) CLI commands.
 - `src/shorts_pipeline/dev_fakes.py` - deterministic fake B and E providers for local smoke runs.
 - `src/shorts_pipeline/inspect.py` - read-only project inspection API.
 - `src/shorts_pipeline/llm/__init__.py` - LLM helper package marker.
@@ -161,6 +162,8 @@ restrictions: null
   required args, directory creation, and clean stdout.
 - `tests/test_dev_cli_run.py` - `run` CLI: fake full A->F completion, stop-at-D without
   `--accept-placeholders`, explicit-provider-choice guard, and supplied candidate JSON.
+- `tests/test_dev_cli_doctor.py` - `doctor` CLI: fake-when-unconfigured readiness, strict
+  non-zero exit, and the guarantee that no API key value is ever printed.
 - `tests/test_dev_inspect_cli.py` - read-only inspect CLI, mutation checks, missing DB/root,
   artifact problems, hash mismatch, unsafe paths, strict mode, and verification skip flags.
 - `tests/test_dev_cli_kdenlive.py` - dev Kdenlive CLI confirmation gate, JSON/human output,
@@ -457,6 +460,16 @@ archival from `completed`.
   human image/rights gate; it never acquires images, scrapes, downloads media, generates TTS,
   renders an MP4, uploads, or runs Kdenlive/melt. Real provider calls occur only when the user
   has opted in and supplied keys via the environment.
+
+### `python -m shorts_pipeline.dev_cli doctor`
+
+- Purpose: report local readiness before a real-LLM run.
+- Required flags: none.
+- Optional flags: `--json`, `--strict` (non-zero exit when the real LLM is not fully configured).
+- Writes: nothing.
+- Safety behavior: reports only the active provider mode, whether the opt-in flag/backend/API
+  key are present (presence booleans and env var names), and which optional dependencies are
+  installed. It never prints, logs, or returns any API key value.
 
 ### `shorts-pipeline-dev`
 

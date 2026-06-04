@@ -121,6 +121,12 @@ sample. For an offline dry run, replace the real-LLM opt-in with
 chosen explicitly — it never silently falls back to fakes when you intend real.
 Real provider calls happen only when you have opted in and supplied keys.
 
+Check your setup first with the readiness report (it never prints key values):
+
+```bash
+python -m shorts_pipeline.dev_cli doctor --json
+```
+
 After a completed run, open the project folder, replace the placeholder images
 under `assets/user_images/` with your rights-cleared images, and open
 `project.kdenlive` in Kdenlive. The command never acquires images, scrapes,

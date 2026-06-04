@@ -28,6 +28,34 @@ def _config() -> ctrl.PipelineConfig:
     return ctrl.PipelineConfig.from_base_dir(base_dir)
 
 
+# Map known failure types to a plain-language next step (no secrets, no stack traces).
+_ERROR_HINTS = {
+    "MissingApiKeyError": "Set the provider API key in your environment (see the sidebar panel).",
+    "MissingSdkError": "Install the optional LLM extra: pip install -e \".[llm]\".",
+    "LlmTransientError": "The provider had a temporary error - try the action again.",
+    "LlmResponseError": "The model returned an unexpected response - try Regenerate.",
+    "OutboundContentError": "An outbound safety check blocked the request - edit your summary/hook.",
+    "UserImageError": "The image was rejected - check the format and size limit.",
+    "ProjectStatusError": "That action is not valid for the current project status.",
+    "ValidationError": "The generated content failed validation - try Regenerate.",
+}
+
+# What each stage does and what to do next, keyed by current status.
+_STAGE_HINTS = {
+    "candidate_selected": "B asks the LLM for a scene-by-scene plan from your summary.",
+    "planned": "C compiles the timeline and generates placeholder PNG assets.",
+    "project_generated": "D: insert your rights-cleared images (or keep placeholders) and confirm.",
+    "waiting_for_user_images": "D: insert your rights-cleared images and confirm rights.",
+    "images_inserted": "E asks the LLM for narration lines and title candidates.",
+    "script_generated": "F writes the local Kdenlive project you open to finish editing.",
+}
+
+
+def _friendly_error(exc: Exception) -> str:
+    hint = _ERROR_HINTS.get(type(exc).__name__)
+    return f"{exc}" if hint is None else f"{exc}\n\n{hint}"
+
+
 def _provider_panel() -> None:
     """Render a secret-free real-LLM readiness panel (names only, no values)."""
     info = ctrl.readiness()
@@ -76,6 +104,20 @@ def _project_picker(current_id: str | None) -> None:
     if st.sidebar.button("New project"):
         st.session_state.pop("project_id", None)
         st.rerun()
+
+
+def _first_run_help() -> None:
+    if ctrl.list_projects(_config()):
+        return  # returning user: keep it out of the way
+    with st.expander("How this works (read me first)", expanded=True):
+        st.markdown(
+            "1. **A** - enter your own summary/hook for a source you found manually.\n"
+            "2. **B/C** - the LLM plans scenes; placeholder images are generated.\n"
+            "3. **D** - upload your rights-cleared images (or keep placeholders).\n"
+            "4. **E/F** - the LLM writes narration/titles; a Kdenlive project is written.\n\n"
+            "Use **Generate full draft (A->F)** for a one-click pass. Nothing is "
+            "crawled, rendered, voiced, or uploaded - you finish in Kdenlive."
+        )
 
 
 def _candidate_form() -> None:
@@ -134,7 +176,7 @@ def _candidate_form() -> None:
         st.rerun()
     except Exception as exc:  # surfaced to the user, not swallowed
         action = "Full draft failed" if full_draft else "Create failed"
-        st.error(f"{action}: {exc}")
+        st.error(f"{action}: {_friendly_error(exc)}")
 
 
 def _stage_button(label: str, action) -> None:
@@ -143,7 +185,7 @@ def _stage_button(label: str, action) -> None:
             action()
             st.rerun()
         except Exception as exc:
-            st.error(f"{label} failed: {exc}")
+            st.error(f"{label} failed: {_friendly_error(exc)}")
 
 
 def _d_form(project_id: str) -> None:
@@ -205,7 +247,7 @@ def _d_form(project_id: str) -> None:
             st.success("D confirmed")
             st.rerun()
         except Exception as exc:
-            st.error(f"Confirm D failed: {exc}")
+            st.error(f"Confirm D failed: {_friendly_error(exc)}")
 
 
 def _preview_b(plan) -> None:
@@ -288,7 +330,7 @@ def _regenerate_actions(project_id: str) -> None:
             st.success(f"New draft: {new_id}")
             st.rerun()
         except Exception as exc:
-            st.error(f"Regenerate failed: {exc}")
+            st.error(f"Regenerate failed: {_friendly_error(exc)}")
     if col_b.button("Edit candidate and restart"):
         candidate = ctrl.load_candidate(config, project_id)
         if candidate is None:
@@ -307,12 +349,16 @@ def main() -> None:
 
     project_id = st.session_state.get("project_id")
     if not project_id:
+        _first_run_help()
         _candidate_form()
         return
 
     config = _config()
     status = ctrl.current_status(config, project_id)
     st.write(f"Current status: `{status}`")
+    hint = _STAGE_HINTS.get(status or "")
+    if hint:
+        st.info(f"Next: {hint}")
 
     _render_previews(project_id)
 
