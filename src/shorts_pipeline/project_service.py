@@ -164,7 +164,9 @@ def create_project_from_candidate(
     conn = connect_db(db_path)
     try:
         init_db(conn)
-        conn.execute("BEGIN")
+        # BEGIN IMMEDIATE takes the write lock before reading the max sequence,
+        # so two concurrent creations cannot allocate the same project ID.
+        conn.execute("BEGIN IMMEDIATE")
         project_id = allocate_project_id(conn, created_dt)
         conn.execute(
             """

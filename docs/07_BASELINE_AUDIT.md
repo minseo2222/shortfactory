@@ -496,6 +496,11 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 - Real LLM provider adapters are opt-in and disabled by default; no real provider call is made
   by tests, CI, or the default pipeline path.
+- Real adapter calls use a request timeout and retry transient errors (HTTP 408/409/429/5xx and
+  timeout/connection failures) with backoff, normalizing exhausted retries into a clear
+  `LlmTransientError`; response parsing tolerates code-fenced and prose-wrapped JSON and missing
+  content. Concurrent project creation uses `BEGIN IMMEDIATE` plus a SQLite busy timeout so two
+  sessions cannot allocate the same project ID.
 - Optional adapters load their SDK dynamically via importlib (no literal SDK import statements),
   read API keys only from the environment at client-construction time, and never store keys in
   artifacts, the DB, logs, or provider object attributes.

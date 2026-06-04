@@ -287,3 +287,85 @@ def test_outbound_scan_refuses_secret_markers() -> None:
     payload["user_or_llm_summary"] = "here is my api_key=sk-abc in the summary"
     with pytest.raises(rp.OutboundContentError):
         rp.minimize_b_source(payload)
+# --- Adapter robustness: parsing, extraction, transient retry (V5) ----------
+
+from types import SimpleNamespace  # noqa: E402
+
+
+def test_parse_json_object_handles_prose_wrapped() -> None:
+    assert rp._parse_json_object('Here is the JSON:\n```json\n{"a": 1}\n```') == {"a": 1}
+    assert rp._parse_json_object('prefix {"x": 2} suffix text') == {"x": 2}
+
+
+def test_openai_backend_extracts_content_and_tolerates_none() -> None:
+    def make(content):
+        completions = SimpleNamespace(
+            create=lambda **kw: SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+            )
+        )
+        return SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+    backend = rp._OpenAIBackend(model="m", client=make('{"ok": true}'))
+    assert backend.complete_json(system="s", user="u") == '{"ok": true}'
+    none_backend = rp._OpenAIBackend(model="m", client=make(None))
+    assert none_backend.complete_json(system="s", user="u") == ""
+
+
+def test_anthropic_backend_joins_only_text_blocks() -> None:
+    blocks = [
+        SimpleNamespace(type="image", text="IGNORED"),
+        SimpleNamespace(type="text", text='{"a": '),
+        SimpleNamespace(type="text", text="1}"),
+    ]
+    client = SimpleNamespace(
+        messages=SimpleNamespace(create=lambda **kw: SimpleNamespace(content=blocks))
+    )
+    backend = rp._AnthropicBackend(model="m", client=client)
+    assert backend.complete_json(system="s", user="u") == '{"a": 1}'
+
+
+def test_gemini_backend_tolerates_none_text() -> None:
+    client = SimpleNamespace(
+        models=SimpleNamespace(generate_content=lambda **kw: SimpleNamespace(text=None))
+    )
+    backend = rp._GeminiBackend(model="m", client=client)
+    assert backend.complete_json(system="s", user="u") == ""
+
+
+class _RateLimitError(Exception):
+    status_code = 429
+
+
+def test_transient_errors_retry_then_raise_normalized(monkeypatch) -> None:
+    monkeypatch.setattr(rp.time, "sleep", lambda *_a, **_k: None)
+    calls = {"n": 0}
+
+    def always_fail():
+        calls["n"] += 1
+        raise _RateLimitError("rate limited")
+
+    with pytest.raises(rp.LlmTransientError):
+        rp._run_sdk_call(always_fail, attempts=2)
+    assert calls["n"] == 3  # 1 initial + 2 retries
+
+
+def test_transient_then_success(monkeypatch) -> None:
+    monkeypatch.setattr(rp.time, "sleep", lambda *_a, **_k: None)
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise _RateLimitError("rate limited")
+        return "ok"
+
+    assert rp._run_sdk_call(flaky, attempts=2) == "ok"
+
+
+def test_non_transient_error_propagates_unchanged() -> None:
+    def fail():
+        raise ValueError("bad request")
+
+    with pytest.raises(ValueError):
+        rp._run_sdk_call(fail, attempts=2)
