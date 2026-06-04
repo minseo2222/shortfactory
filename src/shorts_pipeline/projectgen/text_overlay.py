@@ -8,11 +8,10 @@ import textwrap
 from PIL import Image, ImageDraw
 
 from shorts_pipeline.models import CanvasSpec
+from shorts_pipeline.projectgen.fonts import load_font
 from shorts_pipeline.security import validate_media_extension
 
-
-def _safe_text(text: str) -> str:
-    return text.encode("latin-1", errors="replace").decode("latin-1")
+OVERLAY_FONT_SIZE = 48
 
 
 def _validate_output_path(output_path: str | Path) -> Path:
@@ -39,10 +38,11 @@ def create_text_overlay_png(
     box_top = int(canvas.height * 0.18)
     box_bottom = box_top + 220
     draw.rectangle((80, box_top, canvas.width - 80, box_bottom), fill=(0, 0, 0, 176))
-    wrapped = "\n".join(textwrap.wrap(_safe_text(text), width=18))
+    wrapped = "\n".join(textwrap.wrap(text, width=16)) or " "
     draw.multiline_text(
         (canvas.width // 2, box_top + 110),
         wrapped,
+        font=load_font(OVERLAY_FONT_SIZE),
         fill=(255, 255, 255, 255),
         anchor="mm",
         align="center",

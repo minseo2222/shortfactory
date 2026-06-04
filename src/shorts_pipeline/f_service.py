@@ -211,6 +211,10 @@ def validate_f_kdenlive_manifest_against_inputs(
 
     narration_scene_ids = {line.scene_id for line in e_script.narration_script}
     slots_by_scene = {slot.scene_id: slot for slot in d_manifest.slots}
+    # Expected frame layout: start frames are deterministic and durations tile
+    # exactly up to total_frames (no gaps/overlaps).
+    expected_start_frames = [round(scene.start_sec * manifest.fps) for scene in timeline.scenes]
+    expected_boundaries = [*expected_start_frames[1:], manifest.total_frames]
     for index, (scene_ref, timeline_scene) in enumerate(
         zip(manifest.scenes, timeline.scenes, strict=True),
         start=1,
@@ -226,10 +230,10 @@ def validate_f_kdenlive_manifest_against_inputs(
             raise FKdenliveValidationError("image path must match D actual_image_path")
         if scene_ref.text_overlay_path != timeline_scene.text_overlay_path:
             raise FKdenliveValidationError("text overlay path must match timeline")
-        if scene_ref.start_frame != round(timeline_scene.start_sec * manifest.fps):
+        if scene_ref.start_frame != expected_start_frames[index - 1]:
             raise FKdenliveValidationError("start_frame must be deterministic")
-        if scene_ref.duration_frames != round(timeline_scene.duration_sec * manifest.fps):
-            raise FKdenliveValidationError("duration_frames must be deterministic")
+        if scene_ref.duration_frames != expected_boundaries[index - 1] - expected_start_frames[index - 1]:
+            raise FKdenliveValidationError("duration_frames must tile to the next scene")
         if scene_ref.scene_id not in narration_scene_ids or not scene_ref.narration_script_present:
             raise FKdenliveValidationError("each scene requires E narration")
         if scene_ref.image_slot_id != f"slot_{index:03d}":
@@ -318,8 +322,15 @@ def build_f_kdenlive_manifest(
     """Build the F manifest from validated C, D, and E artifacts."""
     slots_by_scene = {slot.scene_id: slot for slot in d_manifest.slots}
     narration_scene_ids = {line.scene_id for line in e_script.narration_script}
+    total_frames = round(timeline.total_duration_sec * FPS)
+    # Derive each scene's duration in frames from the gap to the next scene's
+    # start frame (last scene runs to total_frames). This guarantees the frames
+    # tile exactly with no 1-frame gaps or overlaps that independent rounding of
+    # round(duration_sec * FPS) can introduce for fractional-second durations.
+    start_frames = [round(scene.start_sec * FPS) for scene in timeline.scenes]
+    boundaries = [*start_frames[1:], total_frames]
     scene_refs: list[dict[str, Any]] = []
-    for scene in timeline.scenes:
+    for index, scene in enumerate(timeline.scenes):
         slot = slots_by_scene[scene.scene_id]
         scene_refs.append(
             {
@@ -327,8 +338,8 @@ def build_f_kdenlive_manifest(
                 "image_slot_id": scene.image_slot_id,
                 "start_sec": scene.start_sec,
                 "duration_sec": scene.duration_sec,
-                "start_frame": round(scene.start_sec * FPS),
-                "duration_frames": round(scene.duration_sec * FPS),
+                "start_frame": start_frames[index],
+                "duration_frames": boundaries[index] - start_frames[index],
                 "image_path": slot.actual_image_path,
                 "text_overlay_path": scene.text_overlay_path,
                 "narration_script_present": scene.scene_id in narration_scene_ids,
@@ -338,7 +349,7 @@ def build_f_kdenlive_manifest(
     manifest = FKdenliveManifest(
         project_id=timeline.project_id,
         total_duration_sec=timeline.total_duration_sec,
-        total_frames=round(timeline.total_duration_sec * FPS),
+        total_frames=total_frames,
         scenes=scene_refs,
         source_artifacts=dict(SOURCE_ARTIFACTS),
         generated_at=generated_at,

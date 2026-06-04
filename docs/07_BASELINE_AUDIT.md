@@ -119,6 +119,8 @@ restrictions: null
 - `src/shorts_pipeline/projectgen/timeline.py` - timeline start-time assignment and B-to-timeline build helper.
 - `src/shorts_pipeline/projectgen/placeholder.py` - local Pillow placeholder PNG generation.
 - `src/shorts_pipeline/projectgen/text_overlay.py` - local transparent text overlay PNG generation.
+- `src/shorts_pipeline/projectgen/fonts.py` - CJK-capable TrueType font resolution (env-overridable)
+  for Hangul rendering in generated PNGs, with a PIL-default fallback.
 - `src/shorts_pipeline/projectgen/replace_images.py` - local replacement instruction Markdown generation.
 - `src/shorts_pipeline/projectgen/kdenlive.py` - standard-library XML builder for the
   self-generated F Kdenlive/MLT skeleton.
@@ -139,6 +141,8 @@ restrictions: null
   status transition, and no-provider behavior.
 - `tests/test_c_compiler.py` - Phase C timeline, generated PNGs, replacement guide,
   DB artifacts, validators, and blocked input/status cases.
+- `tests/test_text_rendering.py` - generated PNGs render Korean (CJK) glyphs and the destructive
+  latin-1 round-trip is gone; glyph assertions skip when no CJK font is installed.
 - `tests/test_d_image_manifest.py` - Phase D draft, confirmation, file/hash validation,
   rights and safety blockers, and E readiness gate.
 - `tests/test_e_script_generation.py` - Phase E D-readiness requirement, provider injection,
@@ -360,9 +364,11 @@ archival from `completed`.
 - Status transition: `images_inserted -> script_generated`.
 - Validation gate: D readiness helper, safe E generation context, Pydantic validation, narration
   scene order, fact-basis connection, speakability heuristic, recommended-title membership,
-  title uniqueness, numeric claim guard, hard overclaim guard, identity guard, mockery/hate
-  guard, forbidden-claims categories, direct-copy check, raw-source term guard, absolute path
-  guard, and metadata guard.
+  title uniqueness, numeric claim guard (titles and narration), hard overclaim guard, identity
+  guard, mockery/hate guard, forbidden-claims categories, direct-copy check, raw-source term
+  guard, absolute path guard, and metadata guard. Term-based guards normalize text first
+  (NFKC + zero-width/format-char removal + whitespace-tolerant matching) to defeat spacing and
+  zero-width obfuscation, applied to both titles and narration.
 - Explicit non-goals: no real provider, no network, no TTS, no voice synthesis, no rendering,
   and no upload.
 
@@ -447,6 +453,7 @@ tests. The pre-audit `main` suite had 114 tests.
 - `tests/test_b_generation.py` - B happy path, retry success/exhaustion, validators, no-provider gate.
 - `tests/test_c_compiler.py` - C happy path, timing, generated PNGs, guide, blocked status/input,
   and timeline validator.
+- `tests/test_text_rendering.py` - CJK glyph rendering and latin-1 regression guard for PNGs.
 - `tests/test_d_image_manifest.py` - D draft/confirmation, direct confirmation, readiness,
   unsafe flags, path, image, dimension, note, rights, face, hash, and forbidden field blockers.
 - `tests/test_e_script_generation.py` - E happy path, D readiness requirement, provider gate,
@@ -489,9 +496,18 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 
 - Real LLM provider adapters are opt-in and disabled by default; no real provider call is made
   by tests, CI, or the default pipeline path.
+- Real adapter calls use a request timeout and retry transient errors (HTTP 408/409/429/5xx and
+  timeout/connection failures) with backoff, normalizing exhausted retries into a clear
+  `LlmTransientError`; response parsing tolerates code-fenced and prose-wrapped JSON and missing
+  content. Concurrent project creation uses `BEGIN IMMEDIATE` plus a SQLite busy timeout so two
+  sessions cannot allocate the same project ID.
 - Optional adapters load their SDK dynamically via importlib (no literal SDK import statements),
   read API keys only from the environment at client-construction time, and never store keys in
   artifacts, the DB, logs, or provider object attributes.
+- Outbound prompts are minimized: B and E send only an allow-listed, length-bounded projection
+  (summary fields plus per-scene narration inputs); `source_url`, project IDs, file paths,
+  SHA-256 hashes, and the full timeline/D-manifest are never transmitted, and each prompt is
+  refused if it carries raw-source or secret markers.
 - B and E default to injected provider protocols and deterministic fake providers in tests/dev smoke.
 - CI guards against direct imports of real provider/network clients in `src` and `tests`.
 - No automated crawling or scraping is implemented.
@@ -499,6 +515,9 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
   allowed in artifacts.
 - Source artifacts store only minimal metadata and explicit storage policy flags.
 - Generated artifact paths are safe relative paths and are checked against project-root containment.
+  Path validation is platform-independent (backslash normalization + POSIX-semantics analysis), and
+  the SQLite CHECK constraints reject backslash and drive-letter `project_dir`/`relative_path`
+  values, so traversal/drive/UNC paths are blocked identically on Linux (CI) and Windows.
 - Artifact rows store SHA-256 hashes; smoke and inspect verify them.
 - D image manifest blocks E readiness for unconfirmed rights, personal information, original
   captures, unsafe paths, missing files, dimension/format problems, face-rights gaps, community
@@ -527,12 +546,34 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 - Lint: `python -m ruff check .`.
 - Tests: `python -m pytest`.
 - Network/provider import guard: scans Python imports in `src` and `tests`.
-- Obvious-secret guard: scans `src`, `tests`, and `.github` for token/key patterns.
+- Obvious-secret guard: scans `src`, `tests`, and `.github` for token/key patterns, including
+  `ghp_`/`github_pat_`, `sk-`/`sk-proj-`/`sk-ant-`, Google `AIza` keys, and quoted
+  `OPENAI/ANTHROPIC/GEMINI/GOOGLE_API_KEY` assignments, across `.py/.yml/.yaml/.toml/.md/.json/
+  .txt/.cfg/.ini/.env/.example` files. (Best-effort lint, not a sandbox.)
 - Required branch-protection check name: `pytest and ruff`.
 - CI does not install optional `llm` extras and does not require API keys.
 
 ## Known Risks and Gaps
 
+- Generated overlay/placeholder PNGs render Hangul using a CJK TrueType font resolved from common
+  platform locations (overridable via `SHORTS_PIPELINE_FONT_PATH`). On a machine with no CJK font
+  installed, text falls back to PIL's default font (no Hangul glyphs); install a CJK font or set
+  the override for correct Korean output.
+- Content-safety term guards are normalization-hardened heuristics (NFKC, zero-width/format-char
+  removal, whitespace-tolerant matching) over curated term lists, applied to titles and
+  narration, plus context-grounding for numbers. They are necessary, not sufficient: they catch
+  marker words and obfuscation, but do not detect an arbitrary embedded real name in free Korean
+  text (a surname-prefix heuristic would false-positive on common words like `정리`/`이것`). The
+  primary controls against unsafe identity/claims remain the LLM safety instruction and human
+  review; treat the guards as defense-in-depth.
+- F frame layout now tiles exactly: per-scene `duration_frames` is derived from the gap to the
+  next scene's `start_frame` (last runs to `total_frames`), so fractional-second durations no
+  longer produce 1-frame gaps/overlaps.
+- Accepted low-risk items left as-is: `security.xml_escape_text` is a tested helper but is not
+  wired into the F builder because `xml.etree.ElementTree` auto-escapes on write; the `events`
+  table is reserved and currently unused; and Phase C copies a placeholder into each user-image
+  slot, which is safe only because C is `planned`-only (it should not become re-runnable without
+  a non-overwrite guard).
 - Real LLM provider adapters are opt-in and disabled by default. Their SDK surface (client
   classes, request signatures, response shapes) is verified locally against installed SDKs by
   `tests/test_real_llm_sdk_contract.py` (skipped offline in CI). No live API call is exercised,

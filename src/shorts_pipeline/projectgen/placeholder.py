@@ -8,7 +8,11 @@ import textwrap
 from PIL import Image, ImageDraw
 
 from shorts_pipeline.models import CanvasSpec
+from shorts_pipeline.projectgen.fonts import load_font
 from shorts_pipeline.security import validate_media_extension
+
+PLACEHOLDER_LABEL_FONT_SIZE = 40
+PLACEHOLDER_BODY_FONT_SIZE = 28
 
 PLACEHOLDER_BACKGROUND = "#1f2937"
 PLACEHOLDER_TEXT = "#f8fafc"
@@ -18,10 +22,6 @@ PLACEHOLDER_WARNINGS = (
     "personal information, original post/comment screenshots,",
     "copyrighted images without rights, risky community logos.",
 )
-
-
-def _safe_text(text: str) -> str:
-    return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
 def _validate_output_path(output_path: str | Path) -> Path:
@@ -67,10 +67,13 @@ def create_placeholder_png(
         for claim in avoid_claims[:4]:
             lines.extend(textwrap.wrap(f"- {claim}", width=42))
 
+    label_font = load_font(PLACEHOLDER_LABEL_FONT_SIZE)
+    body_font = load_font(PLACEHOLDER_BODY_FONT_SIZE)
     y = 180
     for index, line in enumerate(lines):
         fill = PLACEHOLDER_TEXT if index == 0 else PLACEHOLDER_MUTED_TEXT
-        draw.text((90, y), _safe_text(line), fill=fill)
+        font = label_font if index == 0 else body_font
+        draw.text((90, y), line, font=font, fill=fill)
         y += 44
 
     image.save(path)

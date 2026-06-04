@@ -214,3 +214,66 @@ def test_multisample_a_to_f(idx: int, n_scenes: int, tmp_path) -> None:
         for prop in producer.findall("property"):
             if prop.attrib.get("name") == "resource":
                 assert (project_dir / (prop.text or "")).is_file()
+
+
+def _fractional_b_payload() -> dict:
+    # Durations chosen so independent round(start*30)/round(dur*30) would create
+    # off-by-one frame gaps/overlaps; the F builder must tile them contiguously.
+    durs = [8.35, 8.35, 8.35, 8.35]
+    scenes = []
+    for i, per in enumerate(durs, start=1):
+        purpose = "hook" if i == 1 else ("payoff" if i == len(durs) else "context")
+        scenes.append(
+            {
+                "scene_id": f"s{i:02d}",
+                "duration_sec": per,
+                "purpose": purpose,
+                "screen_text": f"Point {i}",
+                "visual_direction": f"Neutral composition for scene {i}.",
+                "image_slot_description": f"Neutral abstract image for scene {i}.",
+                "narration_intent": f"Explain scene {i} from safe metadata only.",
+                "source_basis": [f"fictional summary point {i}"],
+                "do_not_say": [f"{SAFETY_GUARD_TERMS[0]} 추정 금지", f"{SAFETY_GUARD_TERMS[3]} 금지"],
+            }
+        )
+    return {
+        "schema_version": "b_scene_plan.v2.1",
+        "selected_style": STYLES[0],
+        "style_reason": "A concise structure fits this fictional sample.",
+        "target_duration_sec": round(sum(durs)),
+        "scene_plan": scenes,
+        "risk_flags": ["identity inference prohibited", "direct quotation prohibited"],
+    }
+
+
+def test_fractional_durations_produce_contiguous_f_frames(tmp_path) -> None:
+    db_path = tmp_path / "shorts.sqlite3"
+    projects_root = tmp_path / "projects"
+    project = create_project_from_candidate(
+        make_candidate(0), db_path=db_path, projects_root=projects_root, clock=fixed_clock
+    )
+    pid = project.project_id
+    generate_b_scene_plan(
+        pid, db_path=db_path, projects_root=projects_root,
+        provider=VariedBProvider(_fractional_b_payload()), clock=fixed_clock,
+    )
+    timeline = compile_c_project(pid, db_path=db_path, projects_root=projects_root, clock=fixed_clock)
+    initialize_d_image_manifest(pid, db_path=db_path, projects_root=projects_root, clock=fixed_clock)
+    confirm_d_image_manifest(
+        pid, ready_d_payload(timeline), db_path=db_path, projects_root=projects_root, clock=fixed_clock
+    )
+    generate_e_script(
+        pid, db_path=db_path, projects_root=projects_root, provider=DevFakeEProvider(), clock=fixed_clock
+    )
+    manifest = generate_f_kdenlive_project(
+        pid, db_path=db_path, projects_root=projects_root, clock=fixed_clock
+    )
+
+    frames = manifest.scenes
+    # Frames tile exactly: each scene ends where the next begins, no gaps/overlaps.
+    for i in range(len(frames) - 1):
+        assert frames[i].start_frame + frames[i].duration_frames == frames[i + 1].start_frame
+    # The last scene runs to total_frames and every duration is positive.
+    assert frames[-1].start_frame + frames[-1].duration_frames == manifest.total_frames
+    assert all(scene.duration_frames > 0 for scene in frames)
+    assert sum(scene.duration_frames for scene in frames) == manifest.total_frames

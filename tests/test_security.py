@@ -46,3 +46,29 @@ def test_xml_escape_helper_escapes_special_chars() -> None:
     assert "&quot;value&quot;" in escaped
     assert "A&amp;B" in escaped
     assert "&gt;" in escaped
+
+
+@pytest.mark.parametrize(
+    "unsafe",
+    [
+        "C:foo/bar.png",          # drive-relative
+        "C:/abs/bar.png",         # drive-absolute
+        "foo\\..\\bar.png",       # backslash traversal (invisible to a POSIX Path)
+        "\\\\server\\share\\x",   # UNC
+        "/abs/x.png",             # POSIX absolute
+        "a/../b.png",             # embedded traversal
+        "  ",                     # blank
+    ],
+)
+def test_platform_independent_unsafe_paths_rejected(unsafe: str) -> None:
+    # These must be rejected identically on Windows and Linux: the guard
+    # normalizes backslashes and analyses with POSIX semantics.
+    with pytest.raises(SecurityValidationError):
+        ensure_relative_project_path(unsafe)
+
+
+def test_backslash_separated_safe_path_is_normalized() -> None:
+    # A safe relative path that happens to use backslash separators (e.g. a
+    # Windows Path stringified) is normalized to forward slashes, not rejected.
+    result = ensure_relative_project_path("assets\\user_images\\slot_001.png")
+    assert result.as_posix() == "assets/user_images/slot_001.png"

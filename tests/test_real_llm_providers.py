@@ -210,3 +210,162 @@ def test_real_b_provider_drives_full_service_generation(tmp_path) -> None:
 
     assert isinstance(plan, BScenePlan)
     assert (projects_root / project.project_id / "b_scene_plan.json").is_file()
+
+
+# --- Outbound data minimization (V3) ---------------------------------------
+
+
+def test_b_prompt_is_minimized(monkeypatch) -> None:
+    client = FakeClient(valid_b_json())
+    provider = rp.build_b_provider("openai", client=client)
+    provider.generate(source=sample_source(), prompt_version="v", previous_errors=[])
+    sent = client.last_user or ""
+    # Sent: the user-authored summary fields.
+    assert "neutral fictional summary" in sent
+    # Not sent: source URL, project ID, timestamps, storage flags.
+    assert "example.com" not in sent
+    assert "PRJ_2026" not in sent
+    assert "created_at" not in sent
+    assert "storage_policy" not in sent
+
+
+def _e_context_with_paths() -> dict:
+    return {
+        "project_id": "PRJ_20260529_0001",
+        "timeline_json": {
+            "scenes": [
+                {
+                    "scene_id": "s01",
+                    "duration_sec": 8.0,
+                    "screen_text": "안전한 화면 문구",
+                    "fact_basis": ["사용자 요약 근거"],
+                    "avoid_claims": ["실명 추정 금지"],
+                    "image_path": "assets/user_images/slot_001.png",
+                    "text_overlay_path": "assets/text_overlays/s01_text.png",
+                }
+            ]
+        },
+        "d_image_manifest": {
+            "slots": [
+                {
+                    "scene_id": "s01",
+                    "actual_image_note": "사용자 보유 안전 이미지",
+                    "actual_image_path": "assets/user_images/slot_001.png",
+                    "image_sha256": "a" * 64,
+                }
+            ]
+        },
+        "source_reference": {
+            "source_url": "https://example.com/community/post/123",
+            "source_title": "안전한 제목",
+            "summary": "중립적 요약",
+            "hook": "중립적 후킹",
+            "why_shortable": "중립적 이유",
+            "risk_flags_for_user": [],
+        },
+        "voice_policy": {"user_records_voice": True},
+    }
+
+
+def test_e_prompt_is_minimized() -> None:
+    client = FakeClient("{}")
+    provider = rp.build_e_provider("anthropic", client=client)
+    provider.generate(context=_e_context_with_paths(), prompt_version="v", previous_errors=[])
+    sent = client.last_user or ""
+    # Sent: narration inputs and the user summary.
+    assert "안전한 화면 문구" in sent
+    assert "중립적 요약" in sent
+    # Not sent: file paths, SHA-256 hashes, source URL.
+    assert "assets/" not in sent
+    assert "a" * 64 not in sent
+    assert "example.com" not in sent
+    assert "image_sha256" not in sent
+
+
+def test_outbound_scan_refuses_secret_markers() -> None:
+    payload = sample_source().model_dump(mode="json")
+    payload["user_or_llm_summary"] = "here is my api_key=sk-abc in the summary"
+    with pytest.raises(rp.OutboundContentError):
+        rp.minimize_b_source(payload)
+# --- Adapter robustness: parsing, extraction, transient retry (V5) ----------
+
+from types import SimpleNamespace  # noqa: E402
+
+
+def test_parse_json_object_handles_prose_wrapped() -> None:
+    assert rp._parse_json_object('Here is the JSON:\n```json\n{"a": 1}\n```') == {"a": 1}
+    assert rp._parse_json_object('prefix {"x": 2} suffix text') == {"x": 2}
+
+
+def test_openai_backend_extracts_content_and_tolerates_none() -> None:
+    def make(content):
+        completions = SimpleNamespace(
+            create=lambda **kw: SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+            )
+        )
+        return SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+    backend = rp._OpenAIBackend(model="m", client=make('{"ok": true}'))
+    assert backend.complete_json(system="s", user="u") == '{"ok": true}'
+    none_backend = rp._OpenAIBackend(model="m", client=make(None))
+    assert none_backend.complete_json(system="s", user="u") == ""
+
+
+def test_anthropic_backend_joins_only_text_blocks() -> None:
+    blocks = [
+        SimpleNamespace(type="image", text="IGNORED"),
+        SimpleNamespace(type="text", text='{"a": '),
+        SimpleNamespace(type="text", text="1}"),
+    ]
+    client = SimpleNamespace(
+        messages=SimpleNamespace(create=lambda **kw: SimpleNamespace(content=blocks))
+    )
+    backend = rp._AnthropicBackend(model="m", client=client)
+    assert backend.complete_json(system="s", user="u") == '{"a": 1}'
+
+
+def test_gemini_backend_tolerates_none_text() -> None:
+    client = SimpleNamespace(
+        models=SimpleNamespace(generate_content=lambda **kw: SimpleNamespace(text=None))
+    )
+    backend = rp._GeminiBackend(model="m", client=client)
+    assert backend.complete_json(system="s", user="u") == ""
+
+
+class _RateLimitError(Exception):
+    status_code = 429
+
+
+def test_transient_errors_retry_then_raise_normalized(monkeypatch) -> None:
+    monkeypatch.setattr(rp.time, "sleep", lambda *_a, **_k: None)
+    calls = {"n": 0}
+
+    def always_fail():
+        calls["n"] += 1
+        raise _RateLimitError("rate limited")
+
+    with pytest.raises(rp.LlmTransientError):
+        rp._run_sdk_call(always_fail, attempts=2)
+    assert calls["n"] == 3  # 1 initial + 2 retries
+
+
+def test_transient_then_success(monkeypatch) -> None:
+    monkeypatch.setattr(rp.time, "sleep", lambda *_a, **_k: None)
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise _RateLimitError("rate limited")
+        return "ok"
+
+    assert rp._run_sdk_call(flaky, attempts=2) == "ok"
+
+
+def test_non_transient_error_propagates_unchanged() -> None:
+    def fail():
+        raise ValueError("bad request")
+
+    with pytest.raises(ValueError):
+        rp._run_sdk_call(fail, attempts=2)

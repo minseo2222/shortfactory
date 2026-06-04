@@ -292,3 +292,51 @@ def test_redteam_mockery_narration_is_blocked(ready_inputs) -> None:
     payload = valid_e_payload(timeline)
     payload["narration_script"][0]["script"] = "저 사람 정말 한심하고 찌질합니다."
     _expect_e_rejection(payload, ready_inputs)
+
+
+# --- Obfuscation, synonym, and number-grounding bypasses (V2 hardening) -----
+
+
+def test_redteam_spaced_mockery_is_blocked(ready_inputs) -> None:
+    # Inserting spaces between syllables must not slip past the guard.
+    _, timeline, _ = ready_inputs
+    payload = valid_e_payload(timeline)
+    payload["narration_script"][0]["script"] = "저 사람 진짜 멍 청 하네요."
+    _expect_e_rejection(payload, ready_inputs)
+
+
+def test_redteam_zero_width_mockery_title_is_blocked(ready_inputs) -> None:
+    # A zero-width space splitting the term must be normalized away and blocked.
+    _, timeline, _ = ready_inputs
+    payload = _set_recommended_title(
+        valid_e_payload(timeline), "이 사람 멍" + chr(0x200B) + "청이"
+    )
+    _expect_e_rejection(payload, ready_inputs)
+
+
+def test_redteam_obfuscated_identity_marker_is_blocked(ready_inputs) -> None:
+    _, timeline, _ = ready_inputs
+    payload = _set_recommended_title(valid_e_payload(timeline), "그 사람 실 명 공개")
+    _expect_e_rejection(payload, ready_inputs)
+
+
+def test_redteam_synonym_crime_title_is_blocked(ready_inputs) -> None:
+    # A crime synonym not in the original tuple must still be blocked.
+    _, timeline, _ = ready_inputs
+    payload = _set_recommended_title(valid_e_payload(timeline), "이 사람은 유죄")
+    _expect_e_rejection(payload, ready_inputs)
+
+
+def test_redteam_synonym_mockery_narration_is_blocked(ready_inputs) -> None:
+    _, timeline, _ = ready_inputs
+    payload = valid_e_payload(timeline)
+    payload["narration_script"][0]["script"] = "저 사람 진짜 등신 같습니다."
+    _expect_e_rejection(payload, ready_inputs)
+
+
+def test_redteam_context_absent_number_in_narration_is_blocked(ready_inputs) -> None:
+    # Fabricated numbers absent from the safe context must be blocked in narration.
+    _, timeline, _ = ready_inputs
+    payload = valid_e_payload(timeline)
+    payload["narration_script"][0]["script"] = "이 사건은 987654명이 분노했습니다."
+    _expect_e_rejection(payload, ready_inputs)

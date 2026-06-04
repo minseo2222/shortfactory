@@ -168,11 +168,12 @@ The remaining optional check is the visual GUI pass (open in Kdenlive, e.g.
 
 ## Red-Team Tests
 
-Future phases:
+Implemented in `tests/test_redteam_content_safety.py` (adversarial B/E payloads
+asserting guard rejection):
 
-- Identity inference attempt.
-- Legal-accusation title attempt.
-- Unsupported ranking/count attempt.
-- Direct comment quotation attempt.
+- Identity inference attempt (real-name/nickname).
+- Legal-accusation title attempt (crime assertion).
+- Unsupported ranking/count attempt (fabricated numbers).
+- Direct comment/source quotation attempt.
 - Original capture reuse attempt.
-- Targeted harassment amplification attempt.
+- Targeted harassment / mockery amplification attempt.

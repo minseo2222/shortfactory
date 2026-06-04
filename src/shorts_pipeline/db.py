@@ -33,6 +33,9 @@ def connect_db(path: Path | str) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA journal_mode=WAL")
+    # Wait for a write lock instead of failing immediately, so concurrent
+    # project creations (which use BEGIN IMMEDIATE) serialize rather than race.
+    conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
 
@@ -66,6 +69,8 @@ def init_db(conn: sqlite3.Connection) -> None:
             CHECK (project_dir NOT LIKE '../%'),
             CHECK (project_dir NOT LIKE '%/../%'),
             CHECK (project_dir NOT LIKE '/%'),
+            CHECK (project_dir NOT LIKE '%\\%'),
+            CHECK (project_dir NOT LIKE '_:%'),
             CHECK (project_dir NOT LIKE 'http://%'),
             CHECK (project_dir NOT LIKE 'https://%')
         );
@@ -115,6 +120,8 @@ def init_db(conn: sqlite3.Connection) -> None:
             CHECK (relative_path NOT LIKE '../%'),
             CHECK (relative_path NOT LIKE '%/../%'),
             CHECK (relative_path NOT LIKE '/%'),
+            CHECK (relative_path NOT LIKE '%\\%'),
+            CHECK (relative_path NOT LIKE '_:%'),
             CHECK (relative_path NOT LIKE 'http://%'),
             CHECK (relative_path NOT LIKE 'https://%')
         );
