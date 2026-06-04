@@ -27,3 +27,6 @@ def test_github_actions_ci_workflow_has_required_checks() -> None:
     assert "OPENAI_API_KEY" in text
     assert "ANTHROPIC_API_KEY" in text
     assert "GEMINI_API_KEY" in text
+    assert "GOOGLE_API_KEY" in text
+    assert "AIza" in text  # Google API key prefix
+    assert "sk-[A-Za-z0-9_-]{20,}" in text  # covers sk-, sk-proj-, sk-ant-
