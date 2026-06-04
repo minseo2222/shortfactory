@@ -210,3 +210,80 @@ def test_real_b_provider_drives_full_service_generation(tmp_path) -> None:
 
     assert isinstance(plan, BScenePlan)
     assert (projects_root / project.project_id / "b_scene_plan.json").is_file()
+
+
+# --- Outbound data minimization (V3) ---------------------------------------
+
+
+def test_b_prompt_is_minimized(monkeypatch) -> None:
+    client = FakeClient(valid_b_json())
+    provider = rp.build_b_provider("openai", client=client)
+    provider.generate(source=sample_source(), prompt_version="v", previous_errors=[])
+    sent = client.last_user or ""
+    # Sent: the user-authored summary fields.
+    assert "neutral fictional summary" in sent
+    # Not sent: source URL, project ID, timestamps, storage flags.
+    assert "example.com" not in sent
+    assert "PRJ_2026" not in sent
+    assert "created_at" not in sent
+    assert "storage_policy" not in sent
+
+
+def _e_context_with_paths() -> dict:
+    return {
+        "project_id": "PRJ_20260529_0001",
+        "timeline_json": {
+            "scenes": [
+                {
+                    "scene_id": "s01",
+                    "duration_sec": 8.0,
+                    "screen_text": "안전한 화면 문구",
+                    "fact_basis": ["사용자 요약 근거"],
+                    "avoid_claims": ["실명 추정 금지"],
+                    "image_path": "assets/user_images/slot_001.png",
+                    "text_overlay_path": "assets/text_overlays/s01_text.png",
+                }
+            ]
+        },
+        "d_image_manifest": {
+            "slots": [
+                {
+                    "scene_id": "s01",
+                    "actual_image_note": "사용자 보유 안전 이미지",
+                    "actual_image_path": "assets/user_images/slot_001.png",
+                    "image_sha256": "a" * 64,
+                }
+            ]
+        },
+        "source_reference": {
+            "source_url": "https://example.com/community/post/123",
+            "source_title": "안전한 제목",
+            "summary": "중립적 요약",
+            "hook": "중립적 후킹",
+            "why_shortable": "중립적 이유",
+            "risk_flags_for_user": [],
+        },
+        "voice_policy": {"user_records_voice": True},
+    }
+
+
+def test_e_prompt_is_minimized() -> None:
+    client = FakeClient("{}")
+    provider = rp.build_e_provider("anthropic", client=client)
+    provider.generate(context=_e_context_with_paths(), prompt_version="v", previous_errors=[])
+    sent = client.last_user or ""
+    # Sent: narration inputs and the user summary.
+    assert "안전한 화면 문구" in sent
+    assert "중립적 요약" in sent
+    # Not sent: file paths, SHA-256 hashes, source URL.
+    assert "assets/" not in sent
+    assert "a" * 64 not in sent
+    assert "example.com" not in sent
+    assert "image_sha256" not in sent
+
+
+def test_outbound_scan_refuses_secret_markers() -> None:
+    payload = sample_source().model_dump(mode="json")
+    payload["user_or_llm_summary"] = "here is my api_key=sk-abc in the summary"
+    with pytest.raises(rp.OutboundContentError):
+        rp.minimize_b_source(payload)
