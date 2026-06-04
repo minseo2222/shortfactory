@@ -181,6 +181,38 @@ def status_events(config: PipelineConfig, project_id: str) -> list[ProjectStatus
     return list_project_status_events(config.db_path, project_id)
 
 
+@dataclass(frozen=True)
+class ProjectSummary:
+    project_id: str
+    title: str
+    status: str
+    created_at: str
+
+
+def list_projects(config: PipelineConfig) -> list[ProjectSummary]:
+    """Return all stored projects (newest first) for the resume picker.
+
+    Read-only: opens the DB read-only and returns an empty list when no DB
+    exists yet.
+    """
+    if not Path(config.db_path).exists():
+        return []
+    conn = connect_readonly_db(config.db_path)
+    try:
+        rows = conn.execute(
+            "SELECT id, source_title, status, created_at FROM projects "
+            "ORDER BY created_at DESC, id DESC"
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        ProjectSummary(
+            project_id=row[0], title=row[1] or "", status=row[2], created_at=row[3]
+        )
+        for row in rows
+    ]
+
+
 def _load_artifact(config: PipelineConfig, project_id: str, filename: str, model):
     """Load and validate one stored JSON artifact, or return None if absent.
 

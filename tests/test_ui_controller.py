@@ -232,6 +232,21 @@ def test_store_user_image_rejects_path_traversal(tmp_path) -> None:
         ctrl.store_user_image(config, pid, "../escape.png", _PNG_BYTES, filename="ok.png")
 
 
+def test_list_projects_newest_first(tmp_path) -> None:
+    config = make_config(tmp_path)
+    assert ctrl.list_projects(config) == []  # no DB yet
+
+    older = ctrl.create_project(config, candidate(), clock=lambda: datetime(2026, 6, 4, 9, 0, 0))
+    newer = ctrl.create_project(config, candidate(), clock=lambda: datetime(2026, 6, 4, 10, 0, 0))
+
+    summaries = ctrl.list_projects(config)
+    ids = [s.project_id for s in summaries]
+    assert older.project_id in ids and newer.project_id in ids
+    assert ids[0] == newer.project_id  # newest first
+    assert all(s.status for s in summaries)
+    assert all(s.title for s in summaries)
+
+
 def test_build_ready_d_payload_applies_overrides(tmp_path) -> None:
     config = make_config(tmp_path)
     project = ctrl.create_project(config, candidate(), clock=fixed_clock)

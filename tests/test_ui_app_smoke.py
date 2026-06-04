@@ -140,6 +140,38 @@ def test_ui_previews_render_after_full_draft(tmp_path) -> None:
     assert any("Recommended title" in block.value for block in at.success)  # E preview
 
 
+def _candidate(n: int) -> dict:
+    return {
+        "candidate_id": f"ui-{n}",
+        "title": f"Safe fictional title {n}",
+        "source_url": f"https://example.com/community/post/{n}",
+        "community": "manual",
+        "collected_at": "2026-06-01T09:00:00+09:00",
+        "summary": "A neutral fictional summary.",
+        "hook": "A neutral hook.",
+        "why_shortable": "A neutral rationale.",
+        "risk_flags_for_user": [],
+        "status": "selected",
+    }
+
+
+def test_ui_lists_and_resumes_projects(tmp_path) -> None:
+    from datetime import datetime
+
+    cfg = ctrl.PipelineConfig.from_base_dir(tmp_path)
+    first = ctrl.create_project(cfg, _candidate(1), clock=lambda: datetime(2026, 6, 4, 9))
+    second = ctrl.create_project(cfg, _candidate(2), clock=lambda: datetime(2026, 6, 4, 10))
+
+    at = _fresh(tmp_path)
+    labels = [button.label for button in at.button]
+    assert any(first.project_id in label for label in labels)
+    assert any(second.project_id in label for label in labels)
+
+    at = _click(_fresh(tmp_path), f"Open {first.project_id}")
+    assert not at.exception
+    assert at.session_state["project_id"] == first.project_id
+
+
 def test_ui_provider_panel_shows_enable_guidance(tmp_path, monkeypatch) -> None:
     for name in (
         "SHORTS_PIPELINE_ENABLE_REAL_LLM",

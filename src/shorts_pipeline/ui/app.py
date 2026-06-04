@@ -59,7 +59,21 @@ def _sidebar() -> None:
         st.sidebar.subheader("Status history")
         for event in ctrl.status_events(_config(), project_id):
             st.sidebar.write(f"{event.from_status or '-'} -> {event.to_status} ({event.stage})")
-    if st.sidebar.button("Reset session"):
+
+    _project_picker(project_id)
+
+
+def _project_picker(current_id: str | None) -> None:
+    projects = ctrl.list_projects(_config())
+    if projects:
+        st.sidebar.subheader("Open a project")
+        for summary in projects:
+            marker = "* " if summary.project_id == current_id else ""
+            label = f"{marker}Open {summary.project_id} [{summary.status}]"
+            if st.sidebar.button(label, key=f"open_{summary.project_id}"):
+                st.session_state["project_id"] = summary.project_id
+                st.rerun()
+    if st.sidebar.button("New project"):
         st.session_state.pop("project_id", None)
         st.rerun()
 
