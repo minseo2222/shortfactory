@@ -172,8 +172,9 @@ restrictions: null
 - `tests/test_ci_workflow.py` - CI workflow trigger, dependency, action-version, pytest, Ruff,
   network/provider guard, and secret guard checks.
 - `tests/test_real_llm_providers.py` - offline unit tests for the optional real LLM adapters:
-  JSON parsing, prompt construction, opt-in resolver, SDK/key error paths, no-literal-import
-  guard discipline, and service drop-in integration with a fake completion client.
+  JSON parsing, prompt construction, outbound minimization, opt-in resolver, SDK/key error paths,
+  transient retry, no-literal-import guard discipline, service drop-in integration, and an
+  invalid->valid correction loop through the service retry, plus an opt-in (skipped) live E2E.
 - `tests/test_real_llm_sdk_contract.py` - importorskip-guarded contract tests asserting the
   installed OpenAI/Anthropic/Gemini SDK client classes, request method signatures, and response
   shapes match what the adapters call; skipped when the `llm` extra is absent (offline CI).
