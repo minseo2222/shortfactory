@@ -569,11 +569,12 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 - F frame layout now tiles exactly: per-scene `duration_frames` is derived from the gap to the
   next scene's `start_frame` (last runs to `total_frames`), so fractional-second durations no
   longer produce 1-frame gaps/overlaps.
+- Phase C seeds each user-image slot from the placeholder but no longer clobbers a user-replaced
+  image: it copies only when the slot is absent or still identical to the placeholder, so a
+  re-run preserves manual replacements (C remains `planned`-only).
 - Accepted low-risk items left as-is: `security.xml_escape_text` is a tested helper but is not
   wired into the F builder because `xml.etree.ElementTree` auto-escapes on write; the `events`
-  table is reserved and currently unused; and Phase C copies a placeholder into each user-image
-  slot, which is safe only because C is `planned`-only (it should not become re-runnable without
-  a non-overwrite guard).
+  table is reserved and currently unused.
 - Real LLM provider adapters are opt-in and disabled by default. Their SDK surface (client
   classes, request signatures, response shapes) is verified locally against installed SDKs by
   `tests/test_real_llm_sdk_contract.py` (skipped offline in CI). No live API call is exercised,

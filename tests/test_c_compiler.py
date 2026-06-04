@@ -355,3 +355,31 @@ def source_from_project_for_validator() -> SourceArtifact:
         risk_flags_for_user=[],
         created_at="2026-05-29T10:30:00+09:00",
     )
+
+
+def test_c_rerun_preserves_user_replaced_image(tmp_path) -> None:
+    from shorts_pipeline.c_service import _generate_c_files
+
+    db_path, projects_root, project_id = create_planned_project(tmp_path)
+    timeline = compile_c_project(
+        project_id, db_path=db_path, projects_root=projects_root, clock=fixed_clock
+    )
+    project_dir = projects_root / project_id
+    slot = project_dir / timeline.scenes[0].image_path
+    placeholder = (
+        project_dir / "assets" / "placeholders"
+        / f"{timeline.scenes[0].image_slot_id}_placeholder.png"
+    )
+
+    # After C, the slot is a copy of the placeholder.
+    assert slot.read_bytes() == placeholder.read_bytes()
+
+    # Simulate a manual user replacement.
+    user_bytes = b"USER REPLACED IMAGE BYTES"
+    slot.write_bytes(user_bytes)
+
+    # A re-run of the C file generation must not clobber the user image.
+    _generate_c_files(project_dir, timeline)
+    assert slot.read_bytes() == user_bytes
+    # The placeholder is still regenerated (it is not the user slot).
+    assert placeholder.is_file()
