@@ -364,9 +364,11 @@ archival from `completed`.
 - Status transition: `images_inserted -> script_generated`.
 - Validation gate: D readiness helper, safe E generation context, Pydantic validation, narration
   scene order, fact-basis connection, speakability heuristic, recommended-title membership,
-  title uniqueness, numeric claim guard, hard overclaim guard, identity guard, mockery/hate
-  guard, forbidden-claims categories, direct-copy check, raw-source term guard, absolute path
-  guard, and metadata guard.
+  title uniqueness, numeric claim guard (titles and narration), hard overclaim guard, identity
+  guard, mockery/hate guard, forbidden-claims categories, direct-copy check, raw-source term
+  guard, absolute path guard, and metadata guard. Term-based guards normalize text first
+  (NFKC + zero-width/format-char removal + whitespace-tolerant matching) to defeat spacing and
+  zero-width obfuscation, applied to both titles and narration.
 - Explicit non-goals: no real provider, no network, no TTS, no voice synthesis, no rendering,
   and no upload.
 
@@ -542,6 +544,13 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
   platform locations (overridable via `SHORTS_PIPELINE_FONT_PATH`). On a machine with no CJK font
   installed, text falls back to PIL's default font (no Hangul glyphs); install a CJK font or set
   the override for correct Korean output.
+- Content-safety term guards are normalization-hardened heuristics (NFKC, zero-width/format-char
+  removal, whitespace-tolerant matching) over curated term lists, applied to titles and
+  narration, plus context-grounding for numbers. They are necessary, not sufficient: they catch
+  marker words and obfuscation, but do not detect an arbitrary embedded real name in free Korean
+  text (a surname-prefix heuristic would false-positive on common words like `정리`/`이것`). The
+  primary controls against unsafe identity/claims remain the LLM safety instruction and human
+  review; treat the guards as defense-in-depth.
 - Real LLM provider adapters are opt-in and disabled by default. Their SDK surface (client
   classes, request signatures, response shapes) is verified locally against installed SDKs by
   `tests/test_real_llm_sdk_contract.py` (skipped offline in CI). No live API call is exercised,

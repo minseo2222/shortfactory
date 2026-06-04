@@ -6,6 +6,7 @@ import json
 import re
 import sqlite3
 import string
+import unicodedata
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -78,11 +79,17 @@ HARD_OVERCLAIM_TERMS = (
     "사기꾼",
     "가해자",
     "피해자",
+    "유죄",
+    "진범",
     "confirmed",
     "criminal",
     "scammer",
     "perpetrator",
     "victim",
+    "guilty",
+    "fraudster",
+    "thief",
+    "culprit",
 )
 IDENTITY_TERMS = (
     "실명",
@@ -108,6 +115,9 @@ DEROGATORY_TERMS = (
     "한심",
     "찌질",
     "병신",
+    "등신",
+    "또라이",
+    "머저리",
     "쓰레기 같",
     "조롱하",
     "혐오스",
@@ -116,6 +126,8 @@ DEROGATORY_TERMS = (
     "moron",
     "pathetic",
     "scumbag",
+    "clown",
+    "loser",
 )
 CLAIM_GUARD_CATEGORIES = (
     ("real names or nicknames", ("실명", "닉네임", "본명", "real name", "nickname")),
@@ -242,9 +254,38 @@ def _summarize_error(exc: Exception) -> str:
     return text[:500]
 
 
+def _normalize_guard_text(text: str) -> str:
+    """Normalize text before safety matching to defeat simple obfuscation.
+
+    Applies NFKC (so full-width/compatibility variants fold to plain forms) and
+    drops zero-width / format (Unicode category ``Cf``) characters that are used
+    to split a forbidden term (e.g. a zero-width space inserted between
+    syllables). Returns casefolded text.
+    """
+    normalized = unicodedata.normalize("NFKC", text)
+    cleaned = "".join(ch for ch in normalized if unicodedata.category(ch) != "Cf")
+    return cleaned.casefold()
+
+
 def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
-    lowered = text.casefold()
-    return any(term.casefold() in lowered for term in terms)
+    """True if any term appears in the text, tolerant of obfuscation.
+
+    Beyond a direct normalized substring match, a whitespace-tolerant pass
+    allows the term's (non-space) characters to be separated by whitespace
+    (e.g. ``멍 청``). Safety-first: this can over-match in rare cases, which is
+    preferred over letting a spaced/zero-width variant slip through.
+    """
+    normalized = _normalize_guard_text(text)
+    for term in terms:
+        term_norm = _normalize_guard_text(term)
+        if not term_norm:
+            continue
+        if term_norm in normalized:
+            return True
+        spaced = r"\s*".join(re.escape(ch) for ch in term_norm if not ch.isspace())
+        if spaced and re.search(spaced, normalized):
+            return True
+    return False
 
 
 def _safe_allowed_context_texts(
@@ -371,6 +412,7 @@ def _basis_is_connected(
 def _validate_narration_safety(
     script: EScript,
     *,
+    source: SourceArtifact,
     timeline: TimelineJson,
     d_manifest: DImageManifest,
 ) -> None:
@@ -381,6 +423,16 @@ def _validate_narration_safety(
     if len(actual_scene_ids) != len(set(actual_scene_ids)):
         raise EScriptValidationError("narration scene IDs must not contain duplicates")
 
+    allowed_numbers = set(
+        re.findall(
+            r"\d+",
+            " ".join(
+                _safe_allowed_context_texts(
+                    source=source, timeline=timeline, d_manifest=d_manifest
+                )
+            ),
+        )
+    )
     slots_by_scene = {slot.scene_id: slot for slot in d_manifest.slots}
     for line, scene in zip(script.narration_script, timeline.scenes, strict=True):
         if not line.fact_basis:
@@ -400,6 +452,12 @@ def _validate_narration_safety(
             raise EScriptValidationError("narration must not quote comments or raw source text")
         if _contains_any(line.script, DEROGATORY_TERMS):
             raise EScriptValidationError("narration must not mock or demean individuals")
+        if _contains_any(line.script, HARD_OVERCLAIM_TERMS):
+            raise EScriptValidationError("narration must not assert guilt or hard overclaims")
+        if _contains_any(line.script, IDENTITY_TERMS):
+            raise EScriptValidationError("narration must not identify names or nicknames")
+        if set(re.findall(r"\d+", line.script)) - allowed_numbers:
+            raise EScriptValidationError(f"{line.scene_id} narration has unsupported numbers")
 
 
 def validate_e_script_against_inputs(
@@ -417,7 +475,9 @@ def validate_e_script_against_inputs(
     if timeline.project_id != source.project_id or d_manifest.project_id != timeline.project_id:
         raise EScriptValidationError("source, timeline, and D manifest project IDs must match")
 
-    _validate_narration_safety(script, timeline=timeline, d_manifest=d_manifest)
+    _validate_narration_safety(
+        script, source=source, timeline=timeline, d_manifest=d_manifest
+    )
     _validate_title_safety(script, source=source, timeline=timeline, d_manifest=d_manifest)
     _validate_forbidden_claims(script)
     _validate_no_direct_copy(
