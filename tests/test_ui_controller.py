@@ -155,6 +155,26 @@ def test_readiness_ready_with_key_never_leaks_value(monkeypatch) -> None:
     assert "sk-super-secret-value" not in repr(info)
 
 
+def test_artifact_loaders_return_none_then_value(tmp_path) -> None:
+    config = make_config(tmp_path)
+    project = ctrl.create_project(config, candidate(), clock=fixed_clock)
+    pid = project.project_id
+
+    assert ctrl.load_b_plan(config, pid) is None
+    assert ctrl.load_timeline(config, pid) is None
+    assert ctrl.load_e_script(config, pid) is None
+    assert ctrl.load_f_manifest(config, pid) is None
+
+    ctrl.run_b(config, pid, clock=fixed_clock)
+    plan = ctrl.load_b_plan(config, pid)
+    assert plan is not None and len(plan.scene_plan) >= 1
+
+    ctrl.run_c(config, pid, clock=fixed_clock)
+    timeline = ctrl.load_timeline(config, pid)
+    assert timeline is not None and len(timeline.scenes) == len(plan.scene_plan)
+    assert ctrl.load_e_script(config, pid) is None  # not generated yet
+
+
 def test_build_ready_d_payload_applies_overrides(tmp_path) -> None:
     config = make_config(tmp_path)
     project = ctrl.create_project(config, candidate(), clock=fixed_clock)

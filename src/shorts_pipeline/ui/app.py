@@ -18,6 +18,7 @@ from pathlib import Path
 import streamlit as st
 
 from shorts_pipeline.config import load_local_env
+from shorts_pipeline.security import ensure_relative_project_path
 from shorts_pipeline.ui import controller as ctrl
 
 DEFAULT_BASE_DIR = str(Path(".local").resolve())
@@ -160,6 +161,59 @@ def _d_form(project_id: str) -> None:
             st.error(f"Confirm D failed: {exc}")
 
 
+def _preview_b(plan) -> None:
+    st.subheader("Scene plan (B)")
+    st.caption(f"{len(plan.scene_plan)} scenes - target {plan.target_duration_sec}s")
+    for scene in plan.scene_plan:
+        st.markdown(f"- `{scene.scene_id}` - {scene.duration_sec:g}s - {scene.screen_text}")
+        st.caption(scene.narration_intent)
+
+
+def _preview_c_assets(project_id: str, timeline) -> None:
+    st.subheader("Generated assets (C)")
+    project_dir = _config().projects_root / project_id
+    shown = [
+        scene
+        for scene in timeline.scenes
+        if (project_dir / ensure_relative_project_path(scene.image_path)).is_file()
+    ]
+    if not shown:
+        st.caption("No asset images on disk yet.")
+        return
+    columns = st.columns(min(3, len(shown)))
+    for index, scene in enumerate(shown):
+        abs_path = project_dir / ensure_relative_project_path(scene.image_path)
+        columns[index % len(columns)].image(str(abs_path), caption=scene.scene_id)
+
+
+def _preview_e(script) -> None:
+    st.subheader("Narration and titles (E)")
+    st.success(f"Recommended title: {script.recommended_title}")
+    st.markdown("**Title candidates**")
+    for candidate in script.title_candidates:
+        st.markdown(f"- {candidate.title} _({candidate.angle})_")
+    st.markdown("**Narration**")
+    for line in script.narration_script:
+        st.markdown(f"- `{line.scene_id}` ({line.pace}): {line.script}")
+
+
+def _render_previews(project_id: str) -> None:
+    """Read-only previews of whatever stage artifacts exist on disk."""
+    config = _config()
+    try:
+        plan = ctrl.load_b_plan(config, project_id)
+        if plan is not None:
+            _preview_b(plan)
+        timeline = ctrl.load_timeline(config, project_id)
+        if timeline is not None:
+            _preview_c_assets(project_id, timeline)
+        script = ctrl.load_e_script(config, project_id)
+        if script is not None:
+            _preview_e(script)
+    except Exception as exc:  # a preview must never take down the whole app
+        st.warning(f"Preview unavailable: {exc}")
+
+
 def _show_f_result(project_id: str) -> None:
     config = _config()
     project_dir = config.projects_root / project_id
@@ -184,6 +238,8 @@ def main() -> None:
     config = _config()
     status = ctrl.current_status(config, project_id)
     st.write(f"Current status: `{status}`")
+
+    _render_previews(project_id)
 
     if status == "candidate_selected":
         _stage_button("Generate scene plan (B)", lambda: ctrl.run_b(config, project_id))

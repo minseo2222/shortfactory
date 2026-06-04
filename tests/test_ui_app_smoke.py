@@ -128,6 +128,18 @@ def test_ui_one_click_full_draft_reaches_f(tmp_path) -> None:
     assert (cfg.projects_root / project_id / "project.kdenlive").is_file()
 
 
+def test_ui_previews_render_after_full_draft(tmp_path) -> None:
+    # One-click to F, then a fresh render shows the B/E previews.
+    at = _click(_fresh(tmp_path), "Generate full draft (A->F)")
+    project_id = at.session_state["project_id"]
+
+    at = _fresh(tmp_path, project_id)
+    assert not at.exception
+    markdown = " ".join(block.value for block in at.markdown)
+    assert "s01" in markdown  # B scene plan preview
+    assert any("Recommended title" in block.value for block in at.success)  # E preview
+
+
 def test_ui_provider_panel_shows_enable_guidance(tmp_path, monkeypatch) -> None:
     for name in (
         "SHORTS_PIPELINE_ENABLE_REAL_LLM",

@@ -29,6 +29,7 @@ from shorts_pipeline.llm.real_providers import (
 from shorts_pipeline.models import (
     BScenePlan,
     DImageManifest,
+    EScript,
     FKdenliveManifest,
     Project,
     ProjectStatusEvent,
@@ -167,6 +168,34 @@ def current_status(config: PipelineConfig, project_id: str) -> str | None:
 
 def status_events(config: PipelineConfig, project_id: str) -> list[ProjectStatusEvent]:
     return list_project_status_events(config.db_path, project_id)
+
+
+def _load_artifact(config: PipelineConfig, project_id: str, filename: str, model):
+    """Load and validate one stored JSON artifact, or return None if absent.
+
+    Read-only. A missing file yields None; a present-but-invalid file raises so
+    the corruption surfaces rather than being silently hidden.
+    """
+    path = config.projects_root / project_id / filename
+    if not path.exists():
+        return None
+    return model.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def load_b_plan(config: PipelineConfig, project_id: str) -> BScenePlan | None:
+    return _load_artifact(config, project_id, "b_scene_plan.json", BScenePlan)
+
+
+def load_timeline(config: PipelineConfig, project_id: str) -> TimelineJson | None:
+    return _load_artifact(config, project_id, "timeline.json", TimelineJson)
+
+
+def load_e_script(config: PipelineConfig, project_id: str) -> EScript | None:
+    return _load_artifact(config, project_id, "e_script.json", EScript)
+
+
+def load_f_manifest(config: PipelineConfig, project_id: str) -> FKdenliveManifest | None:
+    return _load_artifact(config, project_id, "f_kdenlive_manifest.json", FKdenliveManifest)
 
 
 # --- D image manifest payload construction ----------------------------------
