@@ -340,3 +340,22 @@ def test_redteam_context_absent_number_in_narration_is_blocked(ready_inputs) -> 
     payload = valid_e_payload(timeline)
     payload["narration_script"][0]["script"] = "이 사건은 987654명이 분노했습니다."
     _expect_e_rejection(payload, ready_inputs)
+
+
+# --- Category 7: fabricated fact-basis grounding (W1) ------------------------
+
+
+def test_redteam_generic_factbasis_does_not_ground_narration(ready_inputs) -> None:
+    # A narration fact_basis of only a generic word must NOT count as connected
+    # to the scene (the old generic-term shortcut is removed).
+    _, timeline, _ = ready_inputs
+    payload = valid_e_payload(timeline)
+    payload["narration_script"][0]["fact_basis"] = ["from the timeline"]
+    _expect_e_rejection(payload, ready_inputs)
+
+
+def test_redteam_unrelated_factbasis_is_blocked(ready_inputs) -> None:
+    _, timeline, _ = ready_inputs
+    payload = valid_e_payload(timeline)
+    payload["narration_script"][0]["fact_basis"] = ["completely unrelated invented fact"]
+    _expect_e_rejection(payload, ready_inputs)

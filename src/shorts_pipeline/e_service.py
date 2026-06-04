@@ -381,30 +381,21 @@ def _basis_is_connected(
     scene_avoid_claims: list[str],
     image_note: str | None,
 ) -> bool:
+    # A narration fact_basis must be grounded in THIS scene's own fact_basis,
+    # avoid_claims, or D image note. The previous generic-term shortcut (passing
+    # any basis containing "timeline"/"image"/"source"/etc.) let fabricated
+    # narration attach to any scene, so it is removed: at least one basis item
+    # must genuinely overlap the scene's allowed content.
     allowed_items = [*scene_fact_basis, *scene_avoid_claims]
     if image_note:
         allowed_items.append(image_note)
     allowed_norms = [_normalize_basis(item) for item in allowed_items if item]
-    generic_connected_terms = (
-        "timeline",
-        "타임라인",
-        "image",
-        "이미지",
-        "slot",
-        "슬롯",
-        "source",
-        "사용자",
-        "summary",
-        "요약",
-    )
     for basis in basis_items:
         basis_norm = _normalize_basis(basis)
         if any(
             basis_norm and allowed and (basis_norm in allowed or allowed in basis_norm)
             for allowed in allowed_norms
         ):
-            return True
-        if _contains_any(basis, generic_connected_terms):
             return True
     return False
 

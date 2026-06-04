@@ -363,7 +363,9 @@ archival from `completed`.
 - DB rows: `llm_runs`, `scripts`, `artifacts`, `project_status_events`.
 - Status transition: `images_inserted -> script_generated`.
 - Validation gate: D readiness helper, safe E generation context, Pydantic validation, narration
-  scene order, fact-basis connection, speakability heuristic, recommended-title membership,
+  scene order, scene-specific fact-basis grounding (a narration fact_basis must overlap that
+  scene's own fact_basis/avoid_claims/image note; the generic-term shortcut was removed),
+  speakability heuristic, recommended-title membership,
   title uniqueness, numeric claim guard (titles and narration), hard overclaim guard, identity
   guard, mockery/hate guard, forbidden-claims categories, direct-copy check, raw-source term
   guard, absolute path guard, and metadata guard. Term-based guards normalize text first
