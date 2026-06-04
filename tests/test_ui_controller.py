@@ -110,6 +110,51 @@ def test_provider_mode_real_when_opted_in(monkeypatch) -> None:
     assert isinstance(ctrl.select_e_provider(), RealEScriptProvider)
 
 
+def _clear_llm_env(monkeypatch) -> None:
+    for name in (
+        "SHORTS_PIPELINE_ENABLE_REAL_LLM",
+        "SHORTS_PIPELINE_LLM_BACKEND",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_readiness_fake_when_unconfigured(monkeypatch) -> None:
+    _clear_llm_env(monkeypatch)
+    info = ctrl.readiness()
+    assert info["mode"] == "fake"
+    assert info["ready"] is False
+    assert info["key_present"] is False
+    # The enable flag name must be surfaced as actionable guidance.
+    assert any("SHORTS_PIPELINE_ENABLE_REAL_LLM" in item for item in info["missing"])
+
+
+def test_readiness_real_selected_but_missing_key(monkeypatch) -> None:
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("SHORTS_PIPELINE_ENABLE_REAL_LLM", "1")
+    monkeypatch.setenv("SHORTS_PIPELINE_LLM_BACKEND", "anthropic")
+    info = ctrl.readiness()
+    assert info["mode"] == "real:anthropic"  # attempted...
+    assert info["ready"] is False  # ...but not fully configured
+    assert any("ANTHROPIC_API_KEY" in item for item in info["missing"])
+
+
+def test_readiness_ready_with_key_never_leaks_value(monkeypatch) -> None:
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("SHORTS_PIPELINE_ENABLE_REAL_LLM", "1")
+    monkeypatch.setenv("SHORTS_PIPELINE_LLM_BACKEND", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-super-secret-value")
+    info = ctrl.readiness()
+    assert info["ready"] is True
+    assert info["key_present"] is True
+    assert info["missing"] == []
+    # The secret value must never appear anywhere in the readiness summary.
+    assert "sk-super-secret-value" not in repr(info)
+
+
 def test_build_ready_d_payload_applies_overrides(tmp_path) -> None:
     config = make_config(tmp_path)
     project = ctrl.create_project(config, candidate(), clock=fixed_clock)

@@ -22,10 +22,9 @@ from shorts_pipeline.dev_fakes import DevFakeBProvider, DevFakeEProvider
 from shorts_pipeline.e_service import generate_e_script
 from shorts_pipeline.f_service import generate_f_kdenlive_project
 from shorts_pipeline.llm.real_providers import (
-    real_llm_enabled,
+    provider_readiness,
     resolve_b_provider,
     resolve_e_provider,
-    selected_backend,
 )
 from shorts_pipeline.models import (
     BScenePlan,
@@ -61,10 +60,12 @@ class PipelineConfig:
 
 def provider_mode() -> str:
     """Return a short human-readable label for the active provider mode."""
-    backend = selected_backend()
-    if real_llm_enabled() and backend:
-        return f"real:{backend}"
-    return "fake"
+    return provider_readiness()["mode"]
+
+
+def readiness() -> dict:
+    """Secret-free real-LLM readiness summary for the UI provider panel."""
+    return provider_readiness()
 
 
 def select_b_provider():

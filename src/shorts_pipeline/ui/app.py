@@ -28,13 +28,29 @@ def _config() -> ctrl.PipelineConfig:
     return ctrl.PipelineConfig.from_base_dir(base_dir)
 
 
+def _provider_panel() -> None:
+    """Render a secret-free real-LLM readiness panel (names only, no values)."""
+    info = ctrl.readiness()
+    st.sidebar.write(f"Provider mode: `{info['mode']}`")
+    if info["ready"]:
+        st.sidebar.success(f"Real LLM ready: {info['backend']}")
+        return
+    if info["real_enabled"] and not info["key_present"]:
+        st.sidebar.warning("Real LLM selected but not fully configured; calls will fail.")
+    else:
+        st.sidebar.caption("Using deterministic fake providers (offline) until configured.")
+    lines = ["To enable the real LLM, set these (values are never shown):"]
+    lines += [f"- {item}" for item in info["missing"]]
+    st.sidebar.info("\n".join(lines))
+
+
 def _sidebar() -> None:
     st.sidebar.header("Session")
     st.session_state.setdefault("base_dir", DEFAULT_BASE_DIR)
     st.session_state["base_dir"] = st.sidebar.text_input(
         "Local working directory", value=st.session_state["base_dir"]
     )
-    st.sidebar.write(f"Provider mode: `{ctrl.provider_mode()}`")
+    _provider_panel()
     project_id = st.session_state.get("project_id")
     if project_id:
         st.sidebar.write(f"Project: `{project_id}`")
@@ -50,6 +66,11 @@ def _sidebar() -> None:
 
 def _candidate_form() -> None:
     st.subheader("A. Manual candidate")
+    st.caption(
+        "Fill in your own summary/hook, then either create the project and run "
+        "stages one by one, or generate the whole draft (A->F) in one click. "
+        "One-click uses placeholder images you replace before final editing."
+    )
     with st.form("candidate"):
         source_url = st.text_input("Source URL", value="https://example.com/community/post/1")
         community = st.text_input("Community", value="manual")
@@ -57,27 +78,37 @@ def _candidate_form() -> None:
         summary = st.text_area("Your summary", value="A neutral fictional summary.")
         hook = st.text_input("Hook", value="A neutral hook.")
         why = st.text_input("Why shortable", value="A neutral rationale.")
-        submitted = st.form_submit_button("Create project (A)")
-    if submitted:
-        candidate = {
-            "candidate_id": "ui-candidate",
-            "title": title,
-            "source_url": source_url,
-            "community": community,
-            "collected_at": "2026-06-01T09:00:00+09:00",
-            "summary": summary,
-            "hook": hook,
-            "why_shortable": why,
-            "risk_flags_for_user": [],
-            "status": "selected",
-        }
-        try:
+        col_a, col_b = st.columns(2)
+        created = col_a.form_submit_button("Create project (A)")
+        full_draft = col_b.form_submit_button("Generate full draft (A->F)")
+    if not (created or full_draft):
+        return
+    candidate = {
+        "candidate_id": "ui-candidate",
+        "title": title,
+        "source_url": source_url,
+        "community": community,
+        "collected_at": "2026-06-01T09:00:00+09:00",
+        "summary": summary,
+        "hook": hook,
+        "why_shortable": why,
+        "risk_flags_for_user": [],
+        "status": "selected",
+    }
+    try:
+        if full_draft:
+            with st.spinner("Generating full draft A->F (no rendering, no upload)..."):
+                result = ctrl.run_full_pipeline(_config(), candidate)
+            st.session_state["project_id"] = result["project_id"]
+            st.success(f"Full draft ready: {result['project_id']} ({result['status']})")
+        else:
             project = ctrl.create_project(_config(), candidate)
             st.session_state["project_id"] = project.project_id
             st.success(f"Created {project.project_id}")
-            st.rerun()
-        except Exception as exc:  # surfaced to the user, not swallowed
-            st.error(f"Create failed: {exc}")
+        st.rerun()
+    except Exception as exc:  # surfaced to the user, not swallowed
+        action = "Full draft failed" if full_draft else "Create failed"
+        st.error(f"{action}: {exc}")
 
 
 def _stage_button(label: str, action) -> None:

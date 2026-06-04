@@ -114,3 +114,31 @@ def test_ui_stage_failure_renders_error(tmp_path, monkeypatch) -> None:
     at = _click(_fresh(tmp_path, project_id), "scene plan (B)")
     assert not at.exception
     assert any("failed" in block.value for block in at.error)
+
+
+# --- U1: one-click full draft + provider readiness panel -------------------
+
+
+def test_ui_one_click_full_draft_reaches_f(tmp_path) -> None:
+    cfg = ctrl.PipelineConfig.from_base_dir(tmp_path)
+    at = _click(_fresh(tmp_path), "Generate full draft (A->F)")
+    assert not at.exception
+    project_id = at.session_state["project_id"]
+    assert ctrl.current_status(cfg, project_id) == "script_generated"
+    assert (cfg.projects_root / project_id / "project.kdenlive").is_file()
+
+
+def test_ui_provider_panel_shows_enable_guidance(tmp_path, monkeypatch) -> None:
+    for name in (
+        "SHORTS_PIPELINE_ENABLE_REAL_LLM",
+        "SHORTS_PIPELINE_LLM_BACKEND",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    at = _fresh(tmp_path)
+    assert not at.exception
+    guidance = " ".join(block.value for block in at.info)
+    assert "SHORTS_PIPELINE_ENABLE_REAL_LLM" in guidance

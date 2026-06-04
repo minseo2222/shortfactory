@@ -91,6 +91,53 @@ def _resolve_api_key(backend: str) -> str:
     raise MissingApiKeyError(f"{backend} backend requires {joined} in the environment")
 
 
+def provider_readiness() -> dict[str, Any]:
+    """Return a secret-free summary of the real-LLM opt-in configuration.
+
+    Reports only *whether* the opt-in flag, backend, and an API key are present
+    (presence booleans and environment variable *names*) plus a human-readable
+    ``missing`` checklist. It never returns, logs, or otherwise exposes the
+    value of any API key.
+    """
+    enabled = real_llm_enabled()
+    backend = selected_backend()
+    key_env_candidates: list[str] = []
+    key_present = False
+    missing: list[str] = []
+
+    if not enabled:
+        missing.append(f"set {ENABLE_REAL_LLM_ENV}=1")
+
+    supported = backend in SUPPORTED_BACKENDS
+    if backend is None:
+        missing.append(f"set {LLM_BACKEND_ENV} to one of {', '.join(SUPPORTED_BACKENDS)}")
+    elif not supported:
+        missing.append(
+            f"{LLM_BACKEND_ENV}={backend!r} is not supported; "
+            f"use one of {', '.join(SUPPORTED_BACKENDS)}"
+        )
+    else:
+        key_env_candidates = list(API_KEY_ENVS[backend])
+        key_present = any(os.environ.get(name, "").strip() for name in key_env_candidates)
+        if not key_present:
+            missing.append(f"provide one of {' or '.join(key_env_candidates)}")
+
+    ready = enabled and supported and key_present
+    return {
+        "mode": f"real:{backend}" if (enabled and supported) else "fake",
+        "ready": ready,
+        "real_enabled": enabled,
+        "backend": backend,
+        "backend_supported": supported,
+        "key_present": key_present,
+        "enable_env": ENABLE_REAL_LLM_ENV,
+        "backend_env": LLM_BACKEND_ENV,
+        "key_env_candidates": key_env_candidates,
+        "supported_backends": list(SUPPORTED_BACKENDS),
+        "missing": missing,
+    }
+
+
 def _import_sdk(module_name: str):
     try:
         return importlib.import_module(module_name)
