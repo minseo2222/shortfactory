@@ -88,7 +88,7 @@ restrictions: null
 - `src/shorts_pipeline/db.py` - SQLite connections, schema initialization, read-only DB connection,
   status event insertion, and status event listing.
 - `src/shorts_pipeline/security.py` - safe relative path checks, root containment checks,
-  external resource rejection, XML escaping, media extension validation, and SHA-256 hashing.
+  external resource rejection, media extension validation, and SHA-256 hashing.
 - `src/shorts_pipeline/state_machine.py` - project statuses and allowed transitions.
 - `src/shorts_pipeline/project_service.py` - Phase A manual candidate selection to project row,
   folder tree, and `source.json`.
@@ -270,7 +270,6 @@ foreign keys and request WAL mode for write paths. Read-only inspection uses `mo
 - F outputs reuse `artifacts` rows for `kdenlive_project`, `f_kdenlive_manifest`, and
   `manual_kdenlive_editing_guide`; no F-specific table is added.
 - `project_status_events` - append-only status transition history.
-- `events` - generic event table retained for future event records.
 
 ## State Machine Summary
 
@@ -572,12 +571,11 @@ CI also runs `python -m ruff check .` and `python -m pytest`.
 - F frame layout now tiles exactly: per-scene `duration_frames` is derived from the gap to the
   next scene's `start_frame` (last runs to `total_frames`), so fractional-second durations no
   longer produce 1-frame gaps/overlaps.
-- Phase C seeds each user-image slot from the placeholder but no longer clobbers a user-replaced
-  image: it copies only when the slot is absent or still identical to the placeholder, so a
-  re-run preserves manual replacements (C remains `planned`-only).
-- Accepted low-risk items left as-is: `security.xml_escape_text` is a tested helper but is not
-  wired into the F builder because `xml.etree.ElementTree` auto-escapes on write; the `events`
-  table is reserved and currently unused.
+- Generated F XML is built with `xml.etree.ElementTree`, which auto-escapes text on write; the
+  unused `xml_escape_text` helper and the unused generic `events` table have been removed.
+- Phase C copies a placeholder into each user-image slot only when the slot is absent or still
+  identical to the placeholder, so a re-run preserves a user-replaced image (C remains
+  `planned`-only).
 - Real LLM provider adapters are opt-in and disabled by default. Their SDK surface (client
   classes, request signatures, response shapes) is verified locally against installed SDKs by
   `tests/test_real_llm_sdk_contract.py` (skipped offline in CI). No live API call is exercised,

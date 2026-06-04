@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-from html import escape
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
 
@@ -62,11 +61,6 @@ def reject_external_resource(resource: str) -> None:
     parsed = urlparse(resource)
     if parsed.scheme or parsed.netloc:
         raise SecurityValidationError("external resources are not allowed")
-
-
-def xml_escape_text(text: str) -> str:
-    """Escape text before inserting it into XML content or attributes."""
-    return escape(text, quote=True)
 
 
 def validate_media_extension(path: str | Path) -> None:

@@ -7,7 +7,6 @@ from shorts_pipeline.security import (
     ensure_relative_project_path,
     reject_external_resource,
     validate_media_extension,
-    xml_escape_text,
 )
 
 
@@ -38,14 +37,6 @@ def test_valid_relative_media_path_passes() -> None:
 def test_invalid_media_extension_rejected() -> None:
     with pytest.raises(SecurityValidationError):
         validate_media_extension("assets/user_images/slot_001.exe")
-
-
-def test_xml_escape_helper_escapes_special_chars() -> None:
-    escaped = xml_escape_text("<tag attr=\"value\">A&B's</tag>")
-    assert "&lt;tag" in escaped
-    assert "&quot;value&quot;" in escaped
-    assert "A&amp;B" in escaped
-    assert "&gt;" in escaped
 
 
 @pytest.mark.parametrize(

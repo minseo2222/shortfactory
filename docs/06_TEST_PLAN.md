@@ -25,7 +25,6 @@
 - State transition validation.
 - Safe path validation.
 - External URL resource rejection.
-- XML escaping helper.
 
 ## DB Tests
 
@@ -63,7 +62,7 @@
 - `../evil.png` is rejected.
 - `/absolute/path.png` is rejected.
 - `https://example.com/a.png` is rejected as a media resource.
-- XML special characters are escaped.
+- Backslash/drive/UNC paths are rejected platform-independently.
 - `.env` is not read into logs.
 
 ## Integration Tests
