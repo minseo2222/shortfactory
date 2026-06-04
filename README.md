@@ -85,6 +85,41 @@ real-LLM opt-in (`SHORTS_PIPELINE_ENABLE_REAL_LLM` plus
 `SHORTS_PIPELINE_LLM_BACKEND`) is configured. It does not render video, run TTS,
 upload, or trust external `.kdenlive` files.
 
+## Run the Pipeline (real LLM or fake)
+
+The `run` command drives one candidate through the pipeline from a single
+command. It runs A -> B -> C and, with `--accept-placeholders`, continues
+through D (auto-confirmed from generated placeholder slots) -> E -> F to produce
+a complete local Kdenlive handoff. Without that flag it stops at the D human
+image/rights gate.
+
+To use the real LLM, opt in via environment variables (never committed; loaded
+from a local `.env` if present), then run without `--use-fake-providers`:
+
+```bash
+export SHORTS_PIPELINE_ENABLE_REAL_LLM=1
+export SHORTS_PIPELINE_LLM_BACKEND=anthropic        # or openai / gemini
+export ANTHROPIC_API_KEY=sk-...                     # provider-specific key
+
+python -m shorts_pipeline.dev_cli run \
+  --db-path ./.local/shorts_pipeline.sqlite3 \
+  --projects-root ./.local/projects \
+  --candidate-json ./my_candidate.json \
+  --accept-placeholders \
+  --json
+```
+
+`--candidate-json` is a single `CandidateCard` object; omit it to use a built-in
+sample. For an offline dry run, replace the real-LLM opt-in with
+`--use-fake-providers`. The command refuses to run unless a provider mode is
+chosen explicitly — it never silently falls back to fakes when you intend real.
+Real provider calls happen only when you have opted in and supplied keys.
+
+After a completed run, open the project folder, replace the placeholder images
+under `assets/user_images/` with your rights-cleared images, and open
+`project.kdenlive` in Kdenlive. The command never acquires images, scrapes,
+downloads media, generates TTS, renders an MP4, uploads, or runs Kdenlive/melt.
+
 ## Dev Smoke CLI
 
 Run the local backend smoke path with explicit fake providers:

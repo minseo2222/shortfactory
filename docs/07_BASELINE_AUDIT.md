@@ -104,8 +104,9 @@ restrictions: null
   manifest/XML validation, manual guide writing, artifact persistence, and rollback.
 - `src/shorts_pipeline/smoke.py` - deterministic local A to E integration smoke runner
   with optional F handoff verification.
-- `src/shorts_pipeline/dev_cli.py` - dev-only `smoke`, read-only `inspect`, and
-  local-write `generate-kdenlive` CLI commands.
+- `src/shorts_pipeline/dev_cli.py` - dev-only `smoke`, read-only `inspect`,
+  local-write `generate-kdenlive`, and `run` (A->C or full A->F with
+  `--accept-placeholders`, opt-in real LLM or fake) CLI commands.
 - `src/shorts_pipeline/dev_fakes.py` - deterministic fake B and E providers for local smoke runs.
 - `src/shorts_pipeline/inspect.py` - read-only project inspection API.
 - `src/shorts_pipeline/llm/__init__.py` - LLM helper package marker.
@@ -158,6 +159,8 @@ restrictions: null
   full A->F path, verifying status, scene-count match, Kdenlive profile, and no missing media.
 - `tests/test_dev_cli.py` - dev smoke CLI JSON/human output, fake-provider gate, fixed clock,
   required args, directory creation, and clean stdout.
+- `tests/test_dev_cli_run.py` - `run` CLI: fake full A->F completion, stop-at-D without
+  `--accept-placeholders`, explicit-provider-choice guard, and supplied candidate JSON.
 - `tests/test_dev_inspect_cli.py` - read-only inspect CLI, mutation checks, missing DB/root,
   artifact problems, hash mismatch, unsafe paths, strict mode, and verification skip flags.
 - `tests/test_dev_cli_kdenlive.py` - dev Kdenlive CLI confirmation gate, JSON/human output,
@@ -438,6 +441,22 @@ archival from `completed`.
 - Safety behavior: uses the existing self-generated F service; does not render, run Kdenlive or
   melt, generate TTS/audio, upload, call providers, read API keys, or trust external
   `.kdenlive` files.
+
+### `python -m shorts_pipeline.dev_cli run`
+
+- Purpose: drive the pipeline for one candidate from a single command, using the
+  opt-in real LLM (when configured via environment) or the deterministic fakes.
+- Required flags: `--db-path`, `--projects-root`, and exactly one provider mode
+  (`--use-fake-providers`, or the opt-in real LLM fully configured in the environment).
+- Optional flags: `--candidate-json` (defaults to a built-in sample), `--accept-placeholders`,
+  `--fixed-clock`, `--json`.
+- Writes: local SQLite DB and generated project files; with `--accept-placeholders` also the
+  D placeholder manifest, E script, and F Kdenlive handoff artifacts.
+- Safety behavior: refuses to run unless a provider mode is chosen explicitly (never silently
+  falls back to fakes when real is intended); without `--accept-placeholders` it stops at the D
+  human image/rights gate; it never acquires images, scrapes, downloads media, generates TTS,
+  renders an MP4, uploads, or runs Kdenlive/melt. Real provider calls occur only when the user
+  has opted in and supplied keys via the environment.
 
 ### `shorts-pipeline-dev`
 
