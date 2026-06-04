@@ -137,6 +137,54 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print only one Kdenlive skeleton summary JSON object to stdout.",
     )
+
+    run_parser = subparsers.add_parser(
+        "run",
+        help=(
+            "Run the A -> C (or full A -> F with --accept-placeholders) pipeline "
+            "for one candidate using the opt-in real LLM, or fake providers."
+        ),
+    )
+    run_parser.add_argument("--db-path", required=True, help="SQLite DB path for the run.")
+    run_parser.add_argument(
+        "--projects-root",
+        required=True,
+        help="Projects root directory for generated local files.",
+    )
+    run_parser.add_argument(
+        "--candidate-json",
+        help=(
+            "Path to a CandidateCard JSON file. When omitted, a built-in sample "
+            "candidate is used (useful for a fake-provider dry run)."
+        ),
+    )
+    run_parser.add_argument(
+        "--use-fake-providers",
+        action="store_true",
+        help=(
+            "Force the deterministic dev-only fake providers (offline). When "
+            "omitted, the opt-in real LLM must be configured via environment."
+        ),
+    )
+    run_parser.add_argument(
+        "--accept-placeholders",
+        action="store_true",
+        help=(
+            "Auto-confirm the D image manifest from generated placeholder slots "
+            "(a dry-run handoff) and run E -> F to completion. Without this flag "
+            "the run stops at the D human image/rights gate. No image is acquired, "
+            "no TTS, no MP4 render, no upload."
+        ),
+    )
+    run_parser.add_argument(
+        "--fixed-clock",
+        help="Optional ISO datetime used for deterministic project IDs and timestamps.",
+    )
+    run_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print only the run summary JSON object to stdout.",
+    )
     return parser
 
 
@@ -274,6 +322,104 @@ def _run_generate_kdenlive_command(args: argparse.Namespace) -> int:
     return SUCCESS
 
 
+def _load_candidate(candidate_json: str | None, clock) -> dict[str, object]:
+    if candidate_json is None:
+        from shorts_pipeline.smoke import build_smoke_candidate
+
+        return build_smoke_candidate(clock).model_dump(mode="json")
+
+    path = _resolve_cli_path(candidate_json)
+    _require_existing_file(path, "candidate JSON file")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, OSError) as exc:
+        raise CliConfigurationError(f"could not read candidate JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise CliConfigurationError("candidate JSON must be a single object")
+    return data
+
+
+def _resolve_run_providers(use_fake: bool):
+    """Return (b_provider, e_provider, mode_label), enforcing an explicit choice.
+
+    Fake providers require ``--use-fake-providers``. Otherwise the opt-in real
+    LLM must be fully configured; we never silently fall back to fakes here.
+    """
+    if use_fake:
+        from shorts_pipeline.dev_fakes import DevFakeBProvider, DevFakeEProvider
+
+        return DevFakeBProvider(), DevFakeEProvider(), "fake (dev-only, deterministic, offline)"
+
+    from shorts_pipeline.llm.real_providers import (
+        resolve_b_provider,
+        resolve_e_provider,
+        selected_backend,
+    )
+
+    b_provider = resolve_b_provider()
+    e_provider = resolve_e_provider()
+    if b_provider is None or e_provider is None:
+        raise CliConfigurationError(
+            "real LLM is not configured. Set SHORTS_PIPELINE_ENABLE_REAL_LLM=1, "
+            "select a backend, and provide the API key (see docs), or pass "
+            "--use-fake-providers for an offline dry run."
+        )
+    return b_provider, e_provider, f"real:{selected_backend()}"
+
+
+def _run_pipeline_command(args: argparse.Namespace) -> int:
+    from shorts_pipeline.ui.controller import PipelineConfig, run_pipeline
+
+    db_path = _resolve_cli_path(args.db_path)
+    projects_root = _resolve_cli_path(args.projects_root)
+    clock = _clock_from_fixed_datetime(args.fixed_clock)
+    candidate = _load_candidate(args.candidate_json, clock)
+    b_provider, e_provider, mode_label = _resolve_run_providers(args.use_fake_providers)
+
+    config = PipelineConfig(db_path=db_path, projects_root=projects_root)
+    result = run_pipeline(
+        config,
+        candidate,
+        b_provider=b_provider,
+        e_provider=e_provider,
+        accept_placeholders=args.accept_placeholders,
+        clock=clock,
+    )
+    summary = {
+        "project_id": result["project_id"],
+        "status": result["status"],
+        "completed": result["completed"],
+        "stopped_at": result["stopped_at"],
+        "provider_mode": mode_label,
+        "project_dir": str(projects_root / result["project_id"]),
+        "rendering_performed": False,
+    }
+    if args.json:
+        print(json.dumps(summary, indent=2, ensure_ascii=False))
+        return SUCCESS
+
+    print(f"Pipeline run completed (provider mode: {mode_label})")
+    print(f"Project ID: {summary['project_id']}")
+    print(f"Final status: {summary['status']}")
+    print(f"Project folder: {summary['project_dir']}")
+    if result["completed"]:
+        print("Phases run: A -> B -> C -> D(placeholders) -> E -> F")
+        print("Kdenlive handoff: project.kdenlive (no rendering, no upload performed)")
+        print(
+            "Next: open the project folder, replace placeholder images under "
+            "assets/user_images/ with your rights-cleared images, then open "
+            "project.kdenlive in Kdenlive."
+        )
+    else:
+        print(f"Stopped at: {result['stopped_at']}")
+        print(
+            "Next: add your rights-cleared images under assets/user_images/, then "
+            "confirm the D rights gate in the Streamlit UI (which continues E -> F), "
+            "or re-run with --accept-placeholders for a placeholder dry run."
+        )
+    return SUCCESS
+
+
 def _run_inspect_command(args: argparse.Namespace) -> int:
     db_path = _resolve_cli_path(args.db_path)
     projects_root = _resolve_cli_path(args.projects_root)
@@ -312,6 +458,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "smoke":
             return _run_smoke_command(args)
+        if args.command == "run":
+            return _run_pipeline_command(args)
         if args.command == "inspect":
             return _run_inspect_command(args)
         if args.command == "generate-kdenlive":

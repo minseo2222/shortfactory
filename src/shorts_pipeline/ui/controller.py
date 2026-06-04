@@ -91,12 +91,14 @@ def create_project(
     )
 
 
-def run_b(config: PipelineConfig, project_id: str, *, clock: Clock = None) -> BScenePlan:
+def run_b(
+    config: PipelineConfig, project_id: str, *, provider=None, clock: Clock = None
+) -> BScenePlan:
     return generate_b_scene_plan(
         project_id,
         db_path=config.db_path,
         projects_root=config.projects_root,
-        provider=select_b_provider(),
+        provider=provider if provider is not None else select_b_provider(),
         clock=clock,
     )
 
@@ -129,12 +131,12 @@ def confirm_d(
     )
 
 
-def run_e(config: PipelineConfig, project_id: str, *, clock: Clock = None):
+def run_e(config: PipelineConfig, project_id: str, *, provider=None, clock: Clock = None):
     return generate_e_script(
         project_id,
         db_path=config.db_path,
         projects_root=config.projects_root,
-        provider=select_e_provider(),
+        provider=provider if provider is not None else select_e_provider(),
         clock=clock,
     )
 
@@ -242,4 +244,45 @@ def run_full_pipeline(
         "script": script,
         "f_manifest": manifest,
         "status": current_status(config, project.project_id),
+    }
+
+
+def run_pipeline(
+    config: PipelineConfig,
+    candidate: Mapping[str, Any],
+    *,
+    b_provider,
+    e_provider,
+    accept_placeholders: bool,
+    clock: Clock = None,
+) -> dict[str, Any]:
+    """Run the pipeline with explicit providers for a CLI/automation entry point.
+
+    Always runs A -> B -> C. When ``accept_placeholders`` is True the D image
+    manifest is auto-confirmed from the generated placeholder slots (a dry-run
+    handoff; the user still replaces images before real use) and E -> F run to
+    completion. When False, the run stops at the D human image/rights gate.
+    """
+    project = create_project(config, candidate, clock=clock)
+    project_id = project.project_id
+    run_b(config, project_id, provider=b_provider, clock=clock)
+    timeline = run_c(config, project_id, clock=clock)
+
+    if not accept_placeholders:
+        return {
+            "project_id": project_id,
+            "status": current_status(config, project_id),
+            "completed": False,
+            "stopped_at": "D (manual image insertion and rights confirmation)",
+        }
+
+    init_d(config, project_id, clock=clock)
+    confirm_d(config, project_id, build_ready_d_payload(timeline), clock=clock)
+    run_e(config, project_id, provider=e_provider, clock=clock)
+    run_f(config, project_id, clock=clock)
+    return {
+        "project_id": project_id,
+        "status": current_status(config, project_id),
+        "completed": True,
+        "stopped_at": None,
     }
