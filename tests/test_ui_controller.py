@@ -247,6 +247,24 @@ def test_list_projects_newest_first(tmp_path) -> None:
     assert all(s.title for s in summaries)
 
 
+def test_load_candidate_roundtrip(tmp_path) -> None:
+    config = make_config(tmp_path)
+    project = ctrl.create_project(config, candidate(), clock=fixed_clock)
+    cand = ctrl.load_candidate(config, project.project_id)
+    assert cand is not None
+    assert cand["title"] and cand["summary"] and cand["hook"] and cand["why_shortable"]
+    assert cand["source_url"]
+    assert ctrl.load_candidate(config, "PRJ_99999999_9999") is None
+
+
+def test_regenerate_draft_creates_distinct_completed_project(tmp_path) -> None:
+    config = make_config(tmp_path)
+    first = ctrl.create_project(config, candidate(), clock=lambda: datetime(2026, 6, 4, 9, 0, 0))
+    new_id = ctrl.regenerate_draft(config, first.project_id, clock=lambda: datetime(2026, 6, 4, 10))
+    assert new_id != first.project_id
+    assert ctrl.current_status(config, new_id) == "script_generated"
+
+
 def test_build_ready_d_payload_applies_overrides(tmp_path) -> None:
     config = make_config(tmp_path)
     project = ctrl.create_project(config, candidate(), clock=fixed_clock)

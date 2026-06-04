@@ -172,6 +172,28 @@ def test_ui_lists_and_resumes_projects(tmp_path) -> None:
     assert at.session_state["project_id"] == first.project_id
 
 
+def test_ui_regenerate_creates_new_project(tmp_path) -> None:
+    cfg = ctrl.PipelineConfig.from_base_dir(tmp_path)
+    at = _click(_fresh(tmp_path), "Generate full draft (A->F)")
+    original = at.session_state["project_id"]
+
+    at = _click(_fresh(tmp_path, original), "Regenerate as new draft")
+    assert not at.exception
+    new_id = at.session_state["project_id"]
+    assert new_id != original
+    assert ctrl.current_status(cfg, new_id) == "script_generated"
+
+
+def test_ui_edit_candidate_returns_to_prefilled_form(tmp_path) -> None:
+    at = _click(_fresh(tmp_path), "Generate full draft (A->F)")
+    pid = at.session_state["project_id"]
+
+    at = _click(_fresh(tmp_path, pid), "Edit candidate and restart")
+    assert not at.exception
+    assert "project_id" not in at.session_state
+    assert at.session_state["edit_candidate"]["title"]  # candidate stashed for editing
+
+
 def test_ui_provider_panel_shows_enable_guidance(tmp_path, monkeypatch) -> None:
     for name in (
         "SHORTS_PIPELINE_ENABLE_REAL_LLM",

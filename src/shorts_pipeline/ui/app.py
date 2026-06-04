@@ -85,13 +85,24 @@ def _candidate_form() -> None:
         "stages one by one, or generate the whole draft (A->F) in one click. "
         "One-click uses placeholder images you replace before final editing."
     )
+    prefill = st.session_state.get("edit_candidate", {})
+    if prefill:
+        st.info("Editing a copy of an existing candidate. Submitting creates a new project.")
     with st.form("candidate"):
-        source_url = st.text_input("Source URL", value="https://example.com/community/post/1")
-        community = st.text_input("Community", value="manual")
-        title = st.text_input("Source title", value="A safe fictional source title")
-        summary = st.text_area("Your summary", value="A neutral fictional summary.")
-        hook = st.text_input("Hook", value="A neutral hook.")
-        why = st.text_input("Why shortable", value="A neutral rationale.")
+        source_url = st.text_input(
+            "Source URL", value=prefill.get("source_url", "https://example.com/community/post/1")
+        )
+        community = st.text_input("Community", value=prefill.get("community", "manual"))
+        title = st.text_input(
+            "Source title", value=prefill.get("title", "A safe fictional source title")
+        )
+        summary = st.text_area(
+            "Your summary", value=prefill.get("summary", "A neutral fictional summary.")
+        )
+        hook = st.text_input("Hook", value=prefill.get("hook", "A neutral hook."))
+        why = st.text_input(
+            "Why shortable", value=prefill.get("why_shortable", "A neutral rationale.")
+        )
         col_a, col_b = st.columns(2)
         created = col_a.form_submit_button("Create project (A)")
         full_draft = col_b.form_submit_button("Generate full draft (A->F)")
@@ -119,6 +130,7 @@ def _candidate_form() -> None:
             project = ctrl.create_project(_config(), candidate)
             st.session_state["project_id"] = project.project_id
             st.success(f"Created {project.project_id}")
+        st.session_state.pop("edit_candidate", None)
         st.rerun()
     except Exception as exc:  # surfaced to the user, not swallowed
         action = "Full draft failed" if full_draft else "Create failed"
@@ -259,6 +271,34 @@ def _show_f_result(project_id: str) -> None:
     st.code(str(project_dir / "notes" / "manual_kdenlive_editing.md"))
 
 
+def _regenerate_actions(project_id: str) -> None:
+    config = _config()
+    st.divider()
+    st.caption(
+        "Not happy with this draft? Regenerate makes a NEW project from the same "
+        "candidate (a real LLM gives a fresh take). Edit lets you tweak the "
+        "candidate first. In-place stage re-runs are intentionally not offered."
+    )
+    col_a, col_b = st.columns(2)
+    if col_a.button("Regenerate as new draft (A->F)"):
+        try:
+            with st.spinner("Regenerating a fresh draft..."):
+                new_id = ctrl.regenerate_draft(config, project_id)
+            st.session_state["project_id"] = new_id
+            st.success(f"New draft: {new_id}")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Regenerate failed: {exc}")
+    if col_b.button("Edit candidate and restart"):
+        candidate = ctrl.load_candidate(config, project_id)
+        if candidate is None:
+            st.error("No stored candidate to edit.")
+        else:
+            st.session_state["edit_candidate"] = candidate
+            st.session_state.pop("project_id", None)
+            st.rerun()
+
+
 def main() -> None:
     load_local_env()
     st.set_page_config(page_title="Shorts Pipeline", layout="wide")
@@ -291,6 +331,8 @@ def main() -> None:
             _stage_button("Generate Kdenlive skeleton (F)", lambda: ctrl.run_f(config, project_id))
     else:
         st.info(f"No UI action for status `{status}`.")
+
+    _regenerate_actions(project_id)
 
 
 if __name__ == "__main__":

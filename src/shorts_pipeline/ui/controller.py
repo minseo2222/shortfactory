@@ -33,6 +33,7 @@ from shorts_pipeline.models import (
     FKdenliveManifest,
     Project,
     ProjectStatusEvent,
+    SourceArtifact,
     TimelineJson,
 )
 from shorts_pipeline.project_service import create_project_from_candidate
@@ -239,6 +240,44 @@ def load_e_script(config: PipelineConfig, project_id: str) -> EScript | None:
 
 def load_f_manifest(config: PipelineConfig, project_id: str) -> FKdenliveManifest | None:
     return _load_artifact(config, project_id, "f_kdenlive_manifest.json", FKdenliveManifest)
+
+
+def load_candidate(config: PipelineConfig, project_id: str) -> dict[str, Any] | None:
+    """Reconstruct an editable candidate dict from the stored source.json.
+
+    Read-only. Returns None when the project's source artifact is absent. Used
+    to re-edit or regenerate from the same source without re-typing.
+    """
+    source = _load_artifact(config, project_id, "source.json", SourceArtifact)
+    if source is None:
+        return None
+    return {
+        "candidate_id": f"regen-{project_id}",
+        "title": source.source_title,
+        "source_url": str(source.source_url),
+        "community": source.source_community,
+        "collected_at": source.created_at,
+        "summary": source.user_or_llm_summary,
+        "hook": source.hook,
+        "why_shortable": source.why_shortable,
+        "risk_flags_for_user": list(source.risk_flags_for_user),
+        "status": "selected",
+    }
+
+
+def regenerate_draft(config: PipelineConfig, project_id: str, *, clock: Clock = None) -> str:
+    """Create a NEW project from the same candidate and run A->F again.
+
+    In-place stage re-runs are intentionally not offered (the phase services
+    enforce forward-only preconditions). Regenerating as a fresh project is the
+    safe, state-machine-respecting way to get a new draft (a real LLM yields a
+    different take). Returns the new project id.
+    """
+    candidate = load_candidate(config, project_id)
+    if candidate is None:
+        raise ValueError(f"no stored candidate for project {project_id}")
+    result = run_full_pipeline(config, candidate, clock=clock)
+    return result["project_id"]
 
 
 def store_user_image(
