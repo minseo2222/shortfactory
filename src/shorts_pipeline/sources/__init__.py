@@ -15,6 +15,7 @@ from shorts_pipeline.sources.base import (
 )
 from shorts_pipeline.sources.rss import RssSourceProvider
 from shorts_pipeline.sources.single_link import RobotsChecker, SingleLinkFetchProvider
+from shorts_pipeline.sources.youtube import YouTubeSourceProvider, youtube_enabled
 
 __all__ = [
     "DiscoveredCandidate",
@@ -24,4 +25,6 @@ __all__ = [
     "RssSourceProvider",
     "SingleLinkFetchProvider",
     "RobotsChecker",
+    "YouTubeSourceProvider",
+    "youtube_enabled",
 ]
