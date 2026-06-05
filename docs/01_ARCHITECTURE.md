@@ -13,9 +13,23 @@
 
 ## A. Candidate Input
 
-The default v2.1 mode is `manual_url_only`.
+The default mode is `manual_url_only`. v2.2 adds an opt-in
+`assisted_discovery` mode implemented by `src/shorts_pipeline/sources/`:
 
-The user manually enters:
+- `RssSourceProvider` - published RSS/Atom feeds (Ruliweb `/rss`, Inven news,
+  or any feed URL).
+- `SingleLinkFetchProvider` - one user-pasted public URL, fetched once after a
+  robots.txt check, with no bypass of login/CAPTCHA/Cloudflare walls.
+- `YouTubeSourceProvider` - official YouTube Data API (`chart=mostPopular`,
+  `regionCode=KR`), key from env.
+- `NaverSearchSourceProvider` / `NaverDataLabProvider` - official Naver
+  search and search-trend APIs, Client ID/Secret from env.
+
+Each returns bounded `DiscoveredCandidate` metadata (title, URL, score, source,
+short excerpt); network egress happens only on user trigger and only via these
+lawful paths. The UI then drafts an editable candidate from the chosen item.
+
+The user manually enters (or assisted discovery pre-fills):
 
 - `source_url`
 - `community`

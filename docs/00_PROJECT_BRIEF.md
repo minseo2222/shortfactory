@@ -7,9 +7,17 @@ The user enters a source URL, title, summary, hook, shortability rationale, and
 risk flags. Only selected sources become projects. LLM-shaped outputs must be
 structured and validated before they are stored as artifacts.
 
+v2.2 adds an opt-in **assisted discovery** mode: the user can populate a
+candidate from official APIs (YouTube Data API, Naver search/DataLab), published
+RSS/Atom feeds (e.g. Ruliweb, Inven), or a single user-pasted public URL. This
+is on-demand and lawful only - no automatic/mass crawling of sites without an
+API or feed, and no login/CAPTCHA/IP/rate-limit/header bypass. Only bounded
+metadata (title, URL, score, source, short excerpt) is ever kept.
+
 ## Target User Flow
 
-1. A: User manually creates a candidate card.
+1. A: User adds a candidate - either manually or via opt-in assisted discovery
+   (official API / RSS / single pasted link).
 2. A: User selects one candidate and starts a project.
 3. B: A structured `b_scene_plan.json` is generated and validated.
 4. C: The compiler generates `timeline.json`, media slots, and overlay PNGs.
@@ -33,7 +41,11 @@ structured and validated before they are stored as artifacts.
 
 ## Explicit Non-Goals
 
-- Automated community crawling.
+- Automatic/mass crawling or HTML scraping of sites without an official API or
+  published feed (assisted discovery is limited to official APIs, published
+  RSS/Atom, and single user-pasted links).
+- Any bypass of login, CAPTCHA, IP blocks, rate limits, or headers; ignoring
+  robots.txt; or bulk/systematic copying of a site's database.
 - Storing full source text or full comments.
 - Automated TTS.
 - Automated upload.
