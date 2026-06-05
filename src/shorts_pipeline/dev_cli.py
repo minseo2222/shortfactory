@@ -448,10 +448,20 @@ def _run_doctor_command(args: argparse.Namespace) -> int:
         except ModuleNotFoundError:
             return False
 
+    from shorts_pipeline.sources.naver import naver_enabled
+    from shorts_pipeline.sources.youtube import youtube_enabled
+
     info = provider_readiness()  # secret-free: presence and env var names only
     optional_deps = {
         name: _is_installed(name)
         for name in ("streamlit", "openai", "anthropic", "google.generativeai")
+    }
+    # Source-discovery readiness: presence of keys only, never their values.
+    sources_ready = {
+        "rss": True,  # no key required
+        "single_link": True,  # no key required
+        "youtube": youtube_enabled(),
+        "naver": naver_enabled(),
     }
     summary = {
         "provider_mode": info["mode"],
@@ -461,6 +471,7 @@ def _run_doctor_command(args: argparse.Namespace) -> int:
         "key_present": info["key_present"],
         "missing": info["missing"],
         "optional_deps_installed": optional_deps,
+        "sources_ready": sources_ready,
     }
     if args.json:
         print(json.dumps(summary, indent=2, ensure_ascii=False))
@@ -476,6 +487,9 @@ def _run_doctor_command(args: argparse.Namespace) -> int:
         print("Optional dependencies:")
         for name, installed in optional_deps.items():
             print(f"  - {name}: {'installed' if installed else 'missing'}")
+        print("Source discovery:")
+        for name, ready in sources_ready.items():
+            print(f"  - {name}: {'ready' if ready else 'needs key'}")
 
     if args.strict and not info["ready"]:
         print("strict doctor: real LLM is not fully configured", file=sys.stderr)

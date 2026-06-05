@@ -1,13 +1,12 @@
-"""Local single-user Streamlit UI for the Shorts Pipeline (A->F).
+"""쇼츠 파이프라인 로컬 Streamlit UI (화제 발굴 → A~F 초안).
 
-Run with:
+실행:
 
     python -m streamlit run src/shorts_pipeline/ui/app.py
 
-This file is a thin rendering layer. All orchestration lives in
-``controller.py``. The UI never performs network egress: B/E use the
-deterministic fake providers unless the explicit real-LLM opt-in is configured.
-It does not render video, run TTS, upload, or trust external `.kdenlive` files.
+이 파일은 얇은 렌더링 레이어이며 오케스트레이션은 모두 ``controller.py``에 있습니다.
+네트워크 전송은 사용자가 명시적으로 누를 때(소스 가져오기/opt-in 실제 LLM)만 일어납니다.
+영상 렌더·TTS·업로드·외부 `.kdenlive` 신뢰는 하지 않습니다.
 """
 
 from __future__ import annotations
@@ -28,26 +27,27 @@ def _config() -> ctrl.PipelineConfig:
     return ctrl.PipelineConfig.from_base_dir(base_dir)
 
 
-# Map known failure types to a plain-language next step (no secrets, no stack traces).
+# 알려진 예외를 평범한 한국어 다음 단계 안내로 매핑(비밀·스택트레이스 노출 없음).
 _ERROR_HINTS = {
-    "MissingApiKeyError": "Set the provider API key in your environment (see the sidebar panel).",
-    "MissingSdkError": "Install the optional LLM extra: pip install -e \".[llm]\".",
-    "LlmTransientError": "The provider had a temporary error - try the action again.",
-    "LlmResponseError": "The model returned an unexpected response - try Regenerate.",
-    "OutboundContentError": "An outbound safety check blocked the request - edit your summary/hook.",
-    "UserImageError": "The image was rejected - check the format and size limit.",
-    "ProjectStatusError": "That action is not valid for the current project status.",
-    "ValidationError": "The generated content failed validation - try Regenerate.",
+    "MissingApiKeyError": "환경변수에 제공자 API 키를 설정하세요(사이드바 패널 참고).",
+    "MissingSdkError": '선택 LLM 확장을 설치하세요: pip install -e ".[llm]".',
+    "LlmTransientError": "제공자 일시 오류입니다. 잠시 후 다시 시도하세요.",
+    "LlmResponseError": "모델 응답이 예상과 달랐습니다. 재생성을 시도하세요.",
+    "OutboundContentError": "외부 전송 안전 점검에 막혔습니다. 요약/훅을 수정하세요.",
+    "UserImageError": "이미지가 거부됐습니다. 형식과 크기 제한을 확인하세요.",
+    "ProjectStatusError": "현재 프로젝트 상태에서는 할 수 없는 작업입니다.",
+    "ValidationError": "생성 내용 검증에 실패했습니다. 재생성을 시도하세요.",
+    "SourceError": "소스를 가져오지 못했습니다. 키/URL을 확인하거나 다른 소스를 시도하세요.",
 }
 
-# What each stage does and what to do next, keyed by current status.
+# 현재 상태별로 "이 단계가 무엇을 하는지 / 다음에 할 일".
 _STAGE_HINTS = {
-    "candidate_selected": "B asks the LLM for a scene-by-scene plan from your summary.",
-    "planned": "C compiles the timeline and generates placeholder PNG assets.",
-    "project_generated": "D: insert your rights-cleared images (or keep placeholders) and confirm.",
-    "waiting_for_user_images": "D: insert your rights-cleared images and confirm rights.",
-    "images_inserted": "E asks the LLM for narration lines and title candidates.",
-    "script_generated": "F writes the local Kdenlive project you open to finish editing.",
+    "candidate_selected": "B: 요약을 바탕으로 LLM이 장면별 계획을 만듭니다.",
+    "planned": "C: 타임라인과 플레이스홀더 PNG 에셋을 생성합니다.",
+    "project_generated": "D: 권리처리된 이미지를 넣거나(또는 플레이스홀더 유지) 확인합니다.",
+    "waiting_for_user_images": "D: 권리처리된 이미지를 넣고 권리를 확인합니다.",
+    "images_inserted": "E: LLM이 내레이션과 제목 후보를 작성합니다.",
+    "script_generated": "F: 열어서 편집을 마무리할 로컬 Kdenlive 프로젝트를 만듭니다.",
 }
 
 
@@ -57,34 +57,34 @@ def _friendly_error(exc: Exception) -> str:
 
 
 def _provider_panel() -> None:
-    """Render a secret-free real-LLM readiness panel (names only, no values)."""
+    """비밀값 없는 실제 LLM 준비상태 패널(이름만, 값 미표시)."""
     info = ctrl.readiness()
-    st.sidebar.write(f"Provider mode: `{info['mode']}`")
+    st.sidebar.write(f"AI 제공자 모드: `{info['mode']}`")
     if info["ready"]:
-        st.sidebar.success(f"Real LLM ready: {info['backend']}")
+        st.sidebar.success(f"실제 LLM 준비됨: {info['backend']}")
         return
     if info["real_enabled"] and not info["key_present"]:
-        st.sidebar.warning("Real LLM selected but not fully configured; calls will fail.")
+        st.sidebar.warning("실제 LLM이 선택됐지만 설정이 완전하지 않습니다. 호출이 실패합니다.")
     else:
-        st.sidebar.caption("Using deterministic fake providers (offline) until configured.")
-    lines = ["To enable the real LLM, set these (values are never shown):"]
+        st.sidebar.caption("설정 전까지는 결정적 더미(오프라인)를 사용합니다.")
+    lines = ["실제 LLM을 켜려면 아래를 설정하세요(값은 표시되지 않습니다):"]
     lines += [f"- {item}" for item in info["missing"]]
     st.sidebar.info("\n".join(lines))
 
 
 def _sidebar() -> None:
-    st.sidebar.header("Session")
+    st.sidebar.header("세션")
     st.session_state.setdefault("base_dir", DEFAULT_BASE_DIR)
     st.session_state["base_dir"] = st.sidebar.text_input(
-        "Local working directory", value=st.session_state["base_dir"]
+        "로컬 작업 폴더", value=st.session_state["base_dir"]
     )
     _provider_panel()
     project_id = st.session_state.get("project_id")
     if project_id:
-        st.sidebar.write(f"Project: `{project_id}`")
+        st.sidebar.write(f"프로젝트: `{project_id}`")
         status = ctrl.current_status(_config(), project_id)
-        st.sidebar.write(f"Status: `{status}`")
-        st.sidebar.subheader("Status history")
+        st.sidebar.write(f"상태: `{status}`")
+        st.sidebar.subheader("상태 기록")
         for event in ctrl.status_events(_config(), project_id):
             st.sidebar.write(f"{event.from_status or '-'} -> {event.to_status} ({event.stage})")
 
@@ -94,60 +94,52 @@ def _sidebar() -> None:
 def _project_picker(current_id: str | None) -> None:
     projects = ctrl.list_projects(_config())
     if projects:
-        st.sidebar.subheader("Open a project")
+        st.sidebar.subheader("프로젝트 열기")
         for summary in projects:
             marker = "* " if summary.project_id == current_id else ""
-            label = f"{marker}Open {summary.project_id} [{summary.status}]"
+            label = f"{marker}{summary.project_id} 열기 [{summary.status}]"
             if st.sidebar.button(label, key=f"open_{summary.project_id}"):
                 st.session_state["project_id"] = summary.project_id
                 st.rerun()
-    if st.sidebar.button("New project"):
+    if st.sidebar.button("새 프로젝트"):
         st.session_state.pop("project_id", None)
         st.rerun()
 
 
 def _first_run_help() -> None:
     if ctrl.list_projects(_config()):
-        return  # returning user: keep it out of the way
-    with st.expander("How this works (read me first)", expanded=True):
+        return  # 재방문 사용자에게는 숨김
+    with st.expander("사용법 (먼저 읽기)", expanded=True):
         st.markdown(
-            "1. **A** - enter your own summary/hook for a source you found manually.\n"
-            "2. **B/C** - the LLM plans scenes; placeholder images are generated.\n"
-            "3. **D** - upload your rights-cleared images (or keep placeholders).\n"
-            "4. **E/F** - the LLM writes narration/titles; a Kdenlive project is written.\n\n"
-            "Use **Generate full draft (A->F)** for a one-click pass. Nothing is "
-            "crawled, rendered, voiced, or uploaded - you finish in Kdenlive."
+            "1. **화제 가져오기** — 공식 API/공개 RSS/내가 고른 링크로 후보를 모읍니다.\n"
+            "2. **후보 선택** — 마음에 드는 항목을 하나 고릅니다.\n"
+            "3. **초안 생성(A→F)** — 요약·훅을 자동 초안하고 LLM이 장면·내레이션을 만듭니다.\n"
+            "4. **이미지·마무리** — 권리처리 이미지를 넣고 Kdenlive에서 마무리합니다.\n\n"
+            "자동 크롤링·우회·렌더·TTS·업로드는 하지 않습니다 — 마지막은 Kdenlive에서 마무리합니다."
         )
 
 
 def _candidate_form() -> None:
-    st.subheader("A. Manual candidate")
+    st.subheader("A. 직접 입력")
     st.caption(
-        "Fill in your own summary/hook, then either create the project and run "
-        "stages one by one, or generate the whole draft (A->F) in one click. "
-        "One-click uses placeholder images you replace before final editing."
+        "직접 요약/훅을 채운 뒤, 단계별로 진행하거나 한 번에 전체 초안(A→F)을 만들 수 있습니다. "
+        "원클릭은 플레이스홀더 이미지를 쓰며, 최종 편집 전에 교체하면 됩니다."
     )
     prefill = st.session_state.get("edit_candidate", {})
     if prefill:
-        st.info("Editing a copy of an existing candidate. Submitting creates a new project.")
+        st.info("기존 후보의 사본을 편집 중입니다. 제출하면 새 프로젝트가 생성됩니다.")
     with st.form("candidate"):
         source_url = st.text_input(
-            "Source URL", value=prefill.get("source_url", "https://example.com/community/post/1")
+            "출처 URL", value=prefill.get("source_url", "https://example.com/community/post/1")
         )
-        community = st.text_input("Community", value=prefill.get("community", "manual"))
-        title = st.text_input(
-            "Source title", value=prefill.get("title", "A safe fictional source title")
-        )
-        summary = st.text_area(
-            "Your summary", value=prefill.get("summary", "A neutral fictional summary.")
-        )
-        hook = st.text_input("Hook", value=prefill.get("hook", "A neutral hook."))
-        why = st.text_input(
-            "Why shortable", value=prefill.get("why_shortable", "A neutral rationale.")
-        )
+        community = st.text_input("커뮤니티", value=prefill.get("community", "manual"))
+        title = st.text_input("출처 제목", value=prefill.get("title", "안전한 가상의 출처 제목"))
+        summary = st.text_area("요약(직접 작성)", value=prefill.get("summary", "중립적인 가상 요약."))
+        hook = st.text_input("훅", value=prefill.get("hook", "중립적인 훅."))
+        why = st.text_input("숏폼 적합 이유", value=prefill.get("why_shortable", "중립적인 근거."))
         col_a, col_b = st.columns(2)
-        created = col_a.form_submit_button("Create project (A)")
-        full_draft = col_b.form_submit_button("Generate full draft (A->F)")
+        created = col_a.form_submit_button("프로젝트 생성 (A)")
+        full_draft = col_b.form_submit_button("전체 초안 생성 (A→F)")
     if not (created or full_draft):
         return
     candidate = {
@@ -164,18 +156,18 @@ def _candidate_form() -> None:
     }
     try:
         if full_draft:
-            with st.spinner("Generating full draft A->F (no rendering, no upload)..."):
+            with st.spinner("전체 초안 생성 중 (렌더·업로드 없음)..."):
                 result = ctrl.run_full_pipeline(_config(), candidate)
             st.session_state["project_id"] = result["project_id"]
-            st.success(f"Full draft ready: {result['project_id']} ({result['status']})")
+            st.success(f"전체 초안 완료: {result['project_id']} ({result['status']})")
         else:
             project = ctrl.create_project(_config(), candidate)
             st.session_state["project_id"] = project.project_id
-            st.success(f"Created {project.project_id}")
+            st.success(f"생성됨: {project.project_id}")
         st.session_state.pop("edit_candidate", None)
         st.rerun()
-    except Exception as exc:  # surfaced to the user, not swallowed
-        action = "Full draft failed" if full_draft else "Create failed"
+    except Exception as exc:  # 사용자에게 그대로 노출, 삼키지 않음
+        action = "전체 초안 실패" if full_draft else "생성 실패"
         st.error(f"{action}: {_friendly_error(exc)}")
 
 
@@ -185,26 +177,26 @@ def _stage_button(label: str, action) -> None:
             action()
             st.rerun()
         except Exception as exc:
-            st.error(f"{label} failed: {_friendly_error(exc)}")
+            st.error(f"{label} 실패: {_friendly_error(exc)}")
 
 
 def _d_form(project_id: str) -> None:
-    st.subheader("D. Insert images and confirm rights")
+    st.subheader("D. 이미지 삽입·권리 확인")
     st.write(
-        "Upload your own rights-cleared image for each scene (optional - the "
-        "generated placeholders work for a dry run), then confirm rights below."
+        "장면별로 권리처리된 이미지를 업로드하세요(선택 — 생성된 플레이스홀더로도 시험 가능). "
+        "그런 다음 아래에서 권리를 확인합니다."
     )
     config = _config()
     timeline = ctrl.load_timeline(config, project_id)
     if timeline is None:
-        st.warning("Timeline not found; run C first.")
+        st.warning("타임라인이 없습니다. 먼저 C를 실행하세요.")
         return
     project_dir = config.projects_root / project_id
 
-    # Uploaders live outside the form so each image previews and stores on upload.
+    # 업로더는 폼 밖에 두어 업로드 즉시 미리보기·저장되게 합니다.
     for scene in timeline.scenes:
         uploaded = st.file_uploader(
-            f"Image for {scene.scene_id}",
+            f"{scene.scene_id} 이미지",
             type=["png", "jpg", "jpeg", "webp"],
             key=f"upload_{scene.scene_id}",
         )
@@ -214,23 +206,23 @@ def _d_form(project_id: str) -> None:
                     config, project_id, scene.image_path, uploaded.getvalue(),
                     filename=uploaded.name,
                 )
-                st.caption(f"Stored `{uploaded.name}` into `{scene.image_path}`")
+                st.caption(f"`{uploaded.name}` → `{scene.image_path}` 저장됨")
             except Exception as exc:
-                st.error(f"Image for {scene.scene_id} rejected: {exc}")
+                st.error(f"{scene.scene_id} 이미지 거부됨: {_friendly_error(exc)}")
         abs_path = project_dir / ensure_relative_project_path(scene.image_path)
         if abs_path.is_file():
             st.image(str(abs_path), width=160, caption=scene.scene_id)
 
     with st.form("d_confirm"):
         all_rights = st.checkbox(
-            "I confirm I hold rights for every image", value=True, key="d_all_rights"
+            "모든 이미지의 권리를 보유함을 확인합니다", value=True, key="d_all_rights"
         )
         no_capture = st.checkbox(
-            "None of these are screenshots/captures of the original source",
+            "원본 출처의 스크린샷/캡처가 아닙니다",
             value=True,
             key="d_no_capture",
         )
-        submitted = st.form_submit_button("Confirm D")
+        submitted = st.form_submit_button("D 확인")
     if submitted:
         try:
             if ctrl.current_status(config, project_id) == "project_generated":
@@ -244,22 +236,22 @@ def _d_form(project_id: str) -> None:
             }
             payload = ctrl.build_ready_d_payload(timeline, slot_inputs=slot_inputs)
             ctrl.confirm_d(config, project_id, payload)
-            st.success("D confirmed")
+            st.success("D 확인됨")
             st.rerun()
         except Exception as exc:
-            st.error(f"Confirm D failed: {_friendly_error(exc)}")
+            st.error(f"D 확인 실패: {_friendly_error(exc)}")
 
 
 def _preview_b(plan) -> None:
-    st.subheader("Scene plan (B)")
-    st.caption(f"{len(plan.scene_plan)} scenes - target {plan.target_duration_sec}s")
+    st.subheader("장면 계획 (B)")
+    st.caption(f"{len(plan.scene_plan)}개 장면 · 목표 {plan.target_duration_sec}초")
     for scene in plan.scene_plan:
-        st.markdown(f"- `{scene.scene_id}` - {scene.duration_sec:g}s - {scene.screen_text}")
+        st.markdown(f"- `{scene.scene_id}` · {scene.duration_sec:g}초 · {scene.screen_text}")
         st.caption(scene.narration_intent)
 
 
 def _preview_c_assets(project_id: str, timeline) -> None:
-    st.subheader("Generated assets (C)")
+    st.subheader("생성된 에셋 (C)")
     project_dir = _config().projects_root / project_id
     shown = [
         scene
@@ -267,7 +259,7 @@ def _preview_c_assets(project_id: str, timeline) -> None:
         if (project_dir / ensure_relative_project_path(scene.image_path)).is_file()
     ]
     if not shown:
-        st.caption("No asset images on disk yet.")
+        st.caption("아직 에셋 이미지가 없습니다.")
         return
     columns = st.columns(min(3, len(shown)))
     for index, scene in enumerate(shown):
@@ -276,18 +268,18 @@ def _preview_c_assets(project_id: str, timeline) -> None:
 
 
 def _preview_e(script) -> None:
-    st.subheader("Narration and titles (E)")
-    st.success(f"Recommended title: {script.recommended_title}")
-    st.markdown("**Title candidates**")
+    st.subheader("내레이션·제목 (E)")
+    st.success(f"추천 제목: {script.recommended_title}")
+    st.markdown("**제목 후보**")
     for candidate in script.title_candidates:
         st.markdown(f"- {candidate.title} _({candidate.angle})_")
-    st.markdown("**Narration**")
+    st.markdown("**내레이션**")
     for line in script.narration_script:
         st.markdown(f"- `{line.scene_id}` ({line.pace}): {line.script}")
 
 
 def _render_previews(project_id: str) -> None:
-    """Read-only previews of whatever stage artifacts exist on disk."""
+    """디스크에 존재하는 단계 산출물의 읽기전용 미리보기."""
     config = _config()
     try:
         plan = ctrl.load_b_plan(config, project_id)
@@ -299,17 +291,17 @@ def _render_previews(project_id: str) -> None:
         script = ctrl.load_e_script(config, project_id)
         if script is not None:
             _preview_e(script)
-    except Exception as exc:  # a preview must never take down the whole app
-        st.warning(f"Preview unavailable: {exc}")
+    except Exception as exc:  # 미리보기 오류가 앱 전체를 죽이면 안 됨
+        st.warning(f"미리보기 불가: {exc}")
 
 
 def _show_f_result(project_id: str) -> None:
     config = _config()
     project_dir = config.projects_root / project_id
-    st.success("F Kdenlive skeleton generated.")
-    st.write("Open this file in Kdenlive to finish editing manually:")
+    st.success("F: Kdenlive 골격이 생성됐습니다.")
+    st.write("이 파일을 Kdenlive에서 열어 편집을 마무리하세요:")
     st.code(str(project_dir / "project.kdenlive"))
-    st.write("Handoff notes:")
+    st.write("핸드오프 노트:")
     st.code(str(project_dir / "notes" / "manual_kdenlive_editing.md"))
 
 
@@ -317,24 +309,23 @@ def _regenerate_actions(project_id: str) -> None:
     config = _config()
     st.divider()
     st.caption(
-        "Not happy with this draft? Regenerate makes a NEW project from the same "
-        "candidate (a real LLM gives a fresh take). Edit lets you tweak the "
-        "candidate first. In-place stage re-runs are intentionally not offered."
+        "초안이 마음에 안 드나요? 재생성은 같은 후보로 새 프로젝트를 만듭니다(실제 LLM이면 다른 결과). "
+        "편집은 후보를 먼저 수정합니다. 제자리 단계 재실행은 의도적으로 제공하지 않습니다."
     )
     col_a, col_b = st.columns(2)
-    if col_a.button("Regenerate as new draft (A->F)"):
+    if col_a.button("새 초안으로 재생성 (A→F)"):
         try:
-            with st.spinner("Regenerating a fresh draft..."):
+            with st.spinner("새 초안 재생성 중..."):
                 new_id = ctrl.regenerate_draft(config, project_id)
             st.session_state["project_id"] = new_id
-            st.success(f"New draft: {new_id}")
+            st.success(f"새 초안: {new_id}")
             st.rerun()
         except Exception as exc:
-            st.error(f"Regenerate failed: {_friendly_error(exc)}")
-    if col_b.button("Edit candidate and restart"):
+            st.error(f"재생성 실패: {_friendly_error(exc)}")
+    if col_b.button("후보 편집 후 다시 시작"):
         candidate = ctrl.load_candidate(config, project_id)
         if candidate is None:
-            st.error("No stored candidate to edit.")
+            st.error("편집할 저장된 후보가 없습니다.")
         else:
             st.session_state["edit_candidate"] = candidate
             st.session_state.pop("project_id", None)
@@ -405,7 +396,7 @@ def _discovery_wizard() -> None:
 
 def main() -> None:
     load_local_env()
-    st.set_page_config(page_title="Shorts Pipeline", layout="wide")
+    st.set_page_config(page_title="쇼츠 파이프라인", layout="wide")
     st.title("쇼츠 파이프라인 — 화제 발굴부터 초안까지")
     _sidebar()
 
@@ -419,28 +410,28 @@ def main() -> None:
 
     config = _config()
     status = ctrl.current_status(config, project_id)
-    st.write(f"Current status: `{status}`")
+    st.write(f"현재 상태: `{status}`")
     hint = _STAGE_HINTS.get(status or "")
     if hint:
-        st.info(f"Next: {hint}")
+        st.info(f"다음: {hint}")
 
     _render_previews(project_id)
 
     if status == "candidate_selected":
-        _stage_button("Generate scene plan (B)", lambda: ctrl.run_b(config, project_id))
+        _stage_button("장면 계획 생성 (B)", lambda: ctrl.run_b(config, project_id))
     elif status == "planned":
-        _stage_button("Compile timeline and assets (C)", lambda: ctrl.run_c(config, project_id))
+        _stage_button("타임라인·에셋 컴파일 (C)", lambda: ctrl.run_c(config, project_id))
     elif status in {"project_generated", "waiting_for_user_images"}:
         _d_form(project_id)
     elif status == "images_inserted":
-        _stage_button("Generate narration and titles (E)", lambda: ctrl.run_e(config, project_id))
+        _stage_button("내레이션·제목 생성 (E)", lambda: ctrl.run_e(config, project_id))
     elif status == "script_generated":
         if (config.projects_root / project_id / "project.kdenlive").exists():
             _show_f_result(project_id)
         else:
-            _stage_button("Generate Kdenlive skeleton (F)", lambda: ctrl.run_f(config, project_id))
+            _stage_button("Kdenlive 골격 생성 (F)", lambda: ctrl.run_f(config, project_id))
     else:
-        st.info(f"No UI action for status `{status}`.")
+        st.info(f"이 상태에서는 작업이 없습니다: `{status}`")
 
     _regenerate_actions(project_id)
 

@@ -43,6 +43,19 @@ def test_doctor_strict_fails_when_not_ready(monkeypatch, capsys) -> None:
     assert "not fully configured" in capsys.readouterr().err
 
 
+def test_doctor_reports_source_readiness(monkeypatch, capsys) -> None:
+    _clear(monkeypatch)
+    monkeypatch.delenv("NAVER_CLIENT_ID", raising=False)
+    monkeypatch.delenv("NAVER_CLIENT_SECRET", raising=False)
+    monkeypatch.setenv("YOUTUBE_API_KEY", "yt-key")
+    code = dev_cli.main(["doctor", "--json"])
+    assert code == dev_cli.SUCCESS
+    sources = json.loads(capsys.readouterr().out)["sources_ready"]
+    assert sources["rss"] is True and sources["single_link"] is True
+    assert sources["youtube"] is True  # key set
+    assert sources["naver"] is False  # no credentials
+
+
 def test_doctor_never_prints_key_value(monkeypatch, capsys) -> None:
     _clear(monkeypatch)
     monkeypatch.setenv("SHORTS_PIPELINE_ENABLE_REAL_LLM", "1")
