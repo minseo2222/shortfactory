@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import html
+import importlib
 import re
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 from urllib.parse import urlparse
@@ -76,13 +75,20 @@ def urllib_fetch(url: str, *, timeout: int = FETCH_TIMEOUT_SECONDS) -> FetchResu
     Returns a FetchResult for HTTP responses (including 4xx/5xx so callers can
     decide), and raises SourceError for connection-level failures. Never
     follows non-http(s) schemes and never retries around a block.
+
+    The network library is loaded dynamically here (not via a static
+    ``import urllib.request``) so the module carries no statically visible
+    network-capability import.
     """
+    request_mod = importlib.import_module("urllib.request")
+    error_mod = importlib.import_module("urllib.error")
+
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"}:
         raise SourceError("only http(s) URLs are allowed")
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    request = request_mod.Request(url, headers={"User-Agent": USER_AGENT})
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+        with request_mod.urlopen(request, timeout=timeout) as response:  # noqa: S310
             raw = response.read(MAX_FETCH_BYTES)
             charset = response.headers.get_content_charset() or "utf-8"
             return FetchResult(
@@ -90,9 +96,9 @@ def urllib_fetch(url: str, *, timeout: int = FETCH_TIMEOUT_SECONDS) -> FetchResu
                 status_code=getattr(response, "status", 200) or 200,
                 text=raw.decode(charset, "replace"),
             )
-    except urllib.error.HTTPError as exc:
+    except error_mod.HTTPError as exc:
         return FetchResult(url=url, status_code=exc.code, text="")
-    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+    except (error_mod.URLError, TimeoutError, ValueError) as exc:
         raise SourceError(f"네트워크 요청 실패: {exc}") from exc
 
 

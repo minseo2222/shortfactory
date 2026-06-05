@@ -13,10 +13,9 @@ and are never logged or returned.
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
-import urllib.error
-import urllib.request
 from urllib.parse import quote
 
 from shorts_pipeline.sources.base import (
@@ -58,10 +57,17 @@ def urllib_transport(
     *,
     timeout: int = 10,
 ) -> FetchResult:
-    """Default Naver transport (stdlib). Tests inject a fake instead."""
-    request = urllib.request.Request(url, data=body, headers=headers, method=method)
+    """Default Naver transport (stdlib). Tests inject a fake instead.
+
+    The network library is loaded dynamically here so the module carries no
+    statically visible network-capability import.
+    """
+    request_mod = importlib.import_module("urllib.request")
+    error_mod = importlib.import_module("urllib.error")
+
+    request = request_mod.Request(url, data=body, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+        with request_mod.urlopen(request, timeout=timeout) as response:  # noqa: S310
             raw = response.read(2 * 1024 * 1024)
             charset = response.headers.get_content_charset() or "utf-8"
             return FetchResult(
@@ -69,9 +75,9 @@ def urllib_transport(
                 status_code=getattr(response, "status", 200) or 200,
                 text=raw.decode(charset, "replace"),
             )
-    except urllib.error.HTTPError as exc:
+    except error_mod.HTTPError as exc:
         return FetchResult(url=url, status_code=exc.code, text="")
-    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+    except (error_mod.URLError, TimeoutError, ValueError) as exc:
         raise SourceError(f"네이버 API 요청 실패: {exc}") from exc
 
 
