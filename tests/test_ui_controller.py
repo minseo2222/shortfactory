@@ -265,6 +265,30 @@ def test_regenerate_draft_creates_distinct_completed_project(tmp_path) -> None:
     assert ctrl.current_status(config, new_id) == "script_generated"
 
 
+def test_draft_candidate_from_discovered_creates_valid_project(tmp_path) -> None:
+    config = make_config(tmp_path)
+    discovered = {
+        "title": "오늘의 화제",
+        "url": "https://example.com/post/1",
+        "source": "rss",
+        "excerpt": "짧은 발췌 요약",
+    }
+    drafted = ctrl.draft_candidate_from_discovered(discovered)
+    assert drafted["title"] == "오늘의 화제"
+    assert drafted["source_url"] == "https://example.com/post/1"
+    assert drafted["summary"] and drafted["hook"] and drafted["why_shortable"]
+
+    project = ctrl.create_project(config, drafted, clock=fixed_clock)
+    assert ctrl.current_status(config, project.project_id) == "candidate_selected"
+
+
+def test_discover_candidates_unknown_kind_raises() -> None:
+    from shorts_pipeline.sources import SourceError
+
+    with pytest.raises(SourceError):
+        ctrl.discover_candidates("not-a-source", "x")
+
+
 def test_build_ready_d_payload_applies_overrides(tmp_path) -> None:
     config = make_config(tmp_path)
     project = ctrl.create_project(config, candidate(), clock=fixed_clock)

@@ -341,16 +341,80 @@ def _regenerate_actions(project_id: str) -> None:
             st.rerun()
 
 
+_SOURCE_CHOICES = {
+    "RSS 피드 (루리웹·인벤·임의 피드)": ("rss", "RSS 피드 URL", "https://bbs.ruliweb.com/news/rss"),
+    "링크 1개 (공개 글 주소)": ("link", "공개 글 링크 1개", ""),
+    "YouTube 인기영상 (KR)": ("youtube", "", ""),
+    "네이버 검색 (키워드)": ("naver", "검색어", ""),
+}
+
+
+def _discovery_wizard() -> None:
+    st.subheader("1) 화제 가져오기")
+    st.caption(
+        "공식 API·공개 RSS·내가 고른 링크로만 가져옵니다. 자동 크롤링·우회는 하지 않습니다."
+    )
+    label = st.selectbox("소스", list(_SOURCE_CHOICES.keys()), key="disc_kind")
+    kind, query_label, default = _SOURCE_CHOICES[label]
+    query = ""
+    if query_label:
+        query = st.text_input(query_label, value=default, key="disc_query")
+
+    if st.button("지금 가져오기"):
+        try:
+            with st.spinner("가져오는 중..."):
+                found = ctrl.discover_candidates(kind, query)
+            st.session_state["discovered"] = [c.model_dump() for c in found]
+            if not found:
+                st.info("결과가 없습니다. 다른 소스나 검색어를 시도해 보세요.")
+        except Exception as exc:
+            st.session_state.pop("discovered", None)
+            st.error(f"가져오기 실패: {_friendly_error(exc)}")
+
+    discovered = st.session_state.get("discovered") or []
+    if not discovered:
+        return
+
+    st.subheader("2) 후보 선택")
+    options = list(range(len(discovered)))
+
+    def _fmt(index: int) -> str:
+        item = discovered[index]
+        score = f" · 👍 {item['score']}" if item.get("score") else ""
+        return f"[{item.get('source', '')}] {item['title']}{score}"
+
+    picked = st.radio("후보", options, format_func=_fmt, key="disc_pick")
+    chosen = discovered[picked]
+    if chosen.get("excerpt"):
+        st.caption(chosen["excerpt"])
+
+    st.subheader("3) 초안 생성")
+    st.caption("선택한 후보로 요약·훅을 자동 초안하고 A→F 전체 초안을 한 번에 만듭니다.")
+    if st.button("이 후보로 전체 초안 생성 (A→F)"):
+        try:
+            candidate = ctrl.draft_candidate_from_discovered(chosen)
+            with st.spinner("초안 생성 중 (렌더·업로드 없음)..."):
+                result = ctrl.run_full_pipeline(_config(), candidate)
+            st.session_state["project_id"] = result["project_id"]
+            st.session_state.pop("discovered", None)
+            st.success(f"초안 완료: {result['project_id']}")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"초안 생성 실패: {_friendly_error(exc)}")
+
+
 def main() -> None:
     load_local_env()
     st.set_page_config(page_title="Shorts Pipeline", layout="wide")
-    st.title("Shorts Pipeline - local A->F")
+    st.title("쇼츠 파이프라인 — 화제 발굴부터 초안까지")
     _sidebar()
 
     project_id = st.session_state.get("project_id")
     if not project_id:
         _first_run_help()
-        _candidate_form()
+        _discovery_wizard()
+        with st.expander("직접 입력 (고급)"):
+            _candidate_form()
         return
 
     config = _config()

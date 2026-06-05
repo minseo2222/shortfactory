@@ -209,6 +209,26 @@ def test_ui_first_run_help_and_stage_hint(tmp_path) -> None:
     assert any("Next:" in block.value for block in at.info)
 
 
+def test_ui_wizard_discovers_then_drafts_to_f(tmp_path, monkeypatch) -> None:
+    from shorts_pipeline.sources import DiscoveredCandidate
+
+    cfg = ctrl.PipelineConfig.from_base_dir(tmp_path)
+    fake = [
+        DiscoveredCandidate(
+            title="화제 후보 1", url="https://example.com/1", source="rss", excerpt="요약 발췌"
+        )
+    ]
+    monkeypatch.setattr(ctrl, "discover_candidates", lambda kind, query="": fake)
+
+    at = _click(_fresh(tmp_path), "지금 가져오기")
+    assert not at.exception
+
+    at = _click(at, "이 후보로 전체 초안 생성")
+    assert not at.exception
+    project_id = at.session_state["project_id"]
+    assert ctrl.current_status(cfg, project_id) == "script_generated"
+
+
 def test_ui_provider_panel_shows_enable_guidance(tmp_path, monkeypatch) -> None:
     for name in (
         "SHORTS_PIPELINE_ENABLE_REAL_LLM",
