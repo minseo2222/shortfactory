@@ -75,8 +75,13 @@ upload anything. The project status remains `script_generated`.
 ## 화제 자동 발굴 (assisted discovery)
 
 The local UI opens with a Korean single-screen wizard: **가져오기 → 후보 선택 →
-원클릭 초안(A→F)**. Sources (`src/shorts_pipeline/sources/`) are opt-in and
-lawful only:
+초안 다듬기 → 초안 생성(A→F) → 핸드오프**. After choosing a candidate you can
+edit the auto-drafted 제목/요약/훅 before generating. Sources that need a key
+(YouTube/Naver) are shown as "키 설정 필요" and their fetch button is disabled
+until configured, so you are guided before clicking. When A→F finishes, the
+result screen shows a 다음 할 일 checklist and download buttons for
+`project.kdenlive` and the handoff note. Sources
+(`src/shorts_pipeline/sources/`) are opt-in and lawful only:
 
 - **YouTube 인기영상 (KR)** - official YouTube Data API (`YOUTUBE_API_KEY`).
 - **네이버 검색/데이터랩** - official Naver APIs (`NAVER_CLIENT_ID` /

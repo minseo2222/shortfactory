@@ -245,6 +245,25 @@ def test_ui_handoff_screen_shows_checklist_and_downloads(tmp_path) -> None:
     assert "project.kdenlive" in code
 
 
+def test_ui_wizard_empty_result_shows_message(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(ctrl, "discover_candidates", lambda kind, query="": [])
+    at = _click(_fresh(tmp_path), "지금 가져오기")
+    assert not at.exception
+    assert any("결과가 없습니다" in block.value for block in at.info)
+
+
+def test_ui_wizard_fetch_failure_shows_friendly_error(tmp_path, monkeypatch) -> None:
+    from shorts_pipeline.sources import SourceError
+
+    def _boom(kind, query=""):
+        raise SourceError("네트워크 요청 실패")
+
+    monkeypatch.setattr(ctrl, "discover_candidates", _boom)
+    at = _click(_fresh(tmp_path), "지금 가져오기")
+    assert not at.exception
+    assert any("가져오기 실패" in block.value for block in at.error)
+
+
 def test_ui_wizard_gates_unconfigured_source(tmp_path, monkeypatch) -> None:
     for name in ("YOUTUBE_API_KEY", "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"):
         monkeypatch.delenv(name, raising=False)

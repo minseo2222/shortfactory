@@ -399,7 +399,9 @@ def _discovery_wizard() -> None:
                 found = ctrl.discover_candidates(kind, query)
             st.session_state["discovered"] = [c.model_dump() for c in found]
             if not found:
-                st.info("결과가 없습니다. 다른 소스나 검색어를 시도해 보세요.")
+                st.info(
+                    "결과가 없습니다. 다른 소스나 검색어를 시도하거나, 잠시 후 다시 시도해 보세요."
+                )
         except Exception as exc:
             st.session_state.pop("discovered", None)
             st.error(f"가져오기 실패: {_friendly_error(exc)}")
@@ -409,6 +411,7 @@ def _discovery_wizard() -> None:
         return
 
     st.subheader("2) 후보 선택")
+    st.caption(f"{len(discovered)}개 후보를 찾았습니다. 하나를 고르세요.")
     options = list(range(len(discovered)))
 
     def _fmt(index: int) -> str:
