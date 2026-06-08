@@ -50,6 +50,8 @@ from shorts_pipeline.sources import (
     SingleLinkFetchProvider,
     SourceError,
     YouTubeSourceProvider,
+    naver_enabled,
+    youtube_enabled,
 )
 
 Clock = Callable[[], datetime] | None
@@ -323,6 +325,23 @@ def store_user_image(
 # --- Source discovery (opt-in, legal) ---------------------------------------
 
 SOURCE_KINDS = ("rss", "link", "youtube", "naver")
+
+
+def source_readiness() -> dict[str, dict[str, Any]]:
+    """Per-source readiness for the wizard (presence only, never key values).
+
+    rss/link need no key; youtube/naver report whether their env keys are
+    present, plus the env var *names* the user must set if not.
+    """
+    return {
+        "rss": {"ready": True, "needs": []},
+        "link": {"ready": True, "needs": []},
+        "youtube": {"ready": youtube_enabled(), "needs": ["YOUTUBE_API_KEY"]},
+        "naver": {
+            "ready": naver_enabled(),
+            "needs": ["NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"],
+        },
+    }
 
 
 def discover_candidates(kind: str, query: str = "") -> list[DiscoveredCandidate]:

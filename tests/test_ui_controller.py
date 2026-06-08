@@ -289,6 +289,19 @@ def test_discover_candidates_unknown_kind_raises() -> None:
         ctrl.discover_candidates("not-a-source", "x")
 
 
+def test_source_readiness_gates_keyed_sources(monkeypatch) -> None:
+    for name in ("YOUTUBE_API_KEY", "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"):
+        monkeypatch.delenv(name, raising=False)
+    readiness = ctrl.source_readiness()
+    assert readiness["rss"]["ready"] is True and readiness["link"]["ready"] is True
+    assert readiness["youtube"]["ready"] is False
+    assert "YOUTUBE_API_KEY" in readiness["youtube"]["needs"]
+    assert readiness["naver"]["ready"] is False
+
+    monkeypatch.setenv("YOUTUBE_API_KEY", "k")
+    assert ctrl.source_readiness()["youtube"]["ready"] is True
+
+
 def test_draft_fields_from_discovered_returns_editable_seed() -> None:
     seed = ctrl.draft_fields_from_discovered(
         {"title": "화제", "url": "https://x/1", "source": "rss", "excerpt": "발췌 요약"}

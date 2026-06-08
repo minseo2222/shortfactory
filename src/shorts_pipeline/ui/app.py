@@ -347,11 +347,22 @@ def _discovery_wizard() -> None:
     )
     label = st.selectbox("소스", list(_SOURCE_CHOICES.keys()), key="disc_kind")
     kind, query_label, default = _SOURCE_CHOICES[label]
+
+    readiness = ctrl.source_readiness().get(kind, {"ready": True, "needs": []})
+    if not readiness["ready"]:
+        st.warning(
+            "이 소스는 키 설정이 필요합니다 — 환경변수 "
+            + ", ".join(readiness["needs"])
+            + " 를 설정하세요(값은 표시되지 않습니다)."
+        )
+    else:
+        st.caption("바로 사용 가능합니다." if kind in {"rss", "link"} else "키가 설정되어 사용 가능합니다.")
+
     query = ""
     if query_label:
         query = st.text_input(query_label, value=default, key="disc_query")
 
-    if st.button("지금 가져오기"):
+    if st.button("지금 가져오기", disabled=not readiness["ready"]):
         try:
             with st.spinner("가져오는 중..."):
                 found = ctrl.discover_candidates(kind, query)

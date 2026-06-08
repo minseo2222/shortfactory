@@ -232,6 +232,19 @@ def test_ui_wizard_discovers_then_drafts_to_f(tmp_path, monkeypatch) -> None:
     assert ctrl.load_candidate(cfg, project_id)["title"] == "내가 고친 제목"
 
 
+def test_ui_wizard_gates_unconfigured_source(tmp_path, monkeypatch) -> None:
+    for name in ("YOUTUBE_API_KEY", "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"):
+        monkeypatch.delenv(name, raising=False)
+    at = _fresh(tmp_path)
+    # Select the YouTube source, which needs a key that is not set.
+    at.selectbox[0].set_value("YouTube 인기영상 (KR)").run()
+    assert not at.exception
+    text = " ".join(block.value for block in (*at.warning, *at.markdown))
+    assert "YOUTUBE_API_KEY" in text
+    fetch = next(button for button in at.button if "지금 가져오기" in button.label)
+    assert fetch.disabled is True
+
+
 def test_ui_provider_panel_shows_enable_guidance(tmp_path, monkeypatch) -> None:
     for name in (
         "SHORTS_PIPELINE_ENABLE_REAL_LLM",
