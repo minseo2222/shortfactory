@@ -289,6 +289,21 @@ def test_discover_candidates_unknown_kind_raises() -> None:
         ctrl.discover_candidates("not-a-source", "x")
 
 
+def test_read_project_file_reads_and_guards(tmp_path) -> None:
+    config = make_config(tmp_path)
+    result = ctrl.run_full_pipeline(config, candidate(), clock=fixed_clock)
+    pid = result["project_id"]
+
+    data = ctrl.read_project_file(config, pid, "project.kdenlive")
+    assert data is not None and data.startswith(b"<?xml")
+    assert ctrl.read_project_file(config, pid, "does_not_exist.txt") is None
+
+    from shorts_pipeline.security import SecurityValidationError
+
+    with pytest.raises(SecurityValidationError):
+        ctrl.read_project_file(config, pid, "../escape.txt")
+
+
 def test_source_readiness_gates_keyed_sources(monkeypatch) -> None:
     for name in ("YOUTUBE_API_KEY", "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"):
         monkeypatch.delenv(name, raising=False)

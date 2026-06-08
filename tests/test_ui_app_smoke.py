@@ -232,6 +232,19 @@ def test_ui_wizard_discovers_then_drafts_to_f(tmp_path, monkeypatch) -> None:
     assert ctrl.load_candidate(cfg, project_id)["title"] == "내가 고친 제목"
 
 
+def test_ui_handoff_screen_shows_checklist_and_downloads(tmp_path) -> None:
+    at = _click(_fresh(tmp_path), "전체 초안 생성 (A→F)")
+    project_id = at.session_state["project_id"]
+
+    at = _fresh(tmp_path, project_id)
+    assert not at.exception  # download widgets render without crashing
+    headings = " ".join(block.value for block in at.subheader)
+    markdown = " ".join(block.value for block in at.markdown)
+    assert "다음 할 일" in headings or "다음 할 일" in markdown
+    code = " ".join(block.value for block in at.code)
+    assert "project.kdenlive" in code
+
+
 def test_ui_wizard_gates_unconfigured_source(tmp_path, monkeypatch) -> None:
     for name in ("YOUTUBE_API_KEY", "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"):
         monkeypatch.delenv(name, raising=False)

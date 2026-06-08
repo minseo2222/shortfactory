@@ -253,6 +253,20 @@ def load_f_manifest(config: PipelineConfig, project_id: str) -> FKdenliveManifes
     return _load_artifact(config, project_id, "f_kdenlive_manifest.json", FKdenliveManifest)
 
 
+def read_project_file(config: PipelineConfig, project_id: str, relative_name: str) -> bytes | None:
+    """Read one project file's bytes for download, or None if it is absent.
+
+    Path-guarded: the relative name is validated and resolved under the project
+    directory, so only files inside the project folder can be read.
+    """
+    project_dir = Path(config.projects_root) / project_id
+    safe_relative = ensure_relative_project_path(relative_name)
+    target = ensure_path_under_root(project_dir, project_dir / safe_relative)
+    if not target.is_file():
+        return None
+    return target.read_bytes()
+
+
 def load_candidate(config: PipelineConfig, project_id: str) -> dict[str, Any] | None:
     """Reconstruct an editable candidate dict from the stored source.json.
 

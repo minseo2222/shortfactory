@@ -295,14 +295,45 @@ def _render_previews(project_id: str) -> None:
         st.warning(f"미리보기 불가: {exc}")
 
 
+def _download_button(project_id: str, relative_name: str, label: str, mime: str) -> None:
+    data = ctrl.read_project_file(_config(), project_id, relative_name)
+    if data is None:
+        return
+    st.download_button(
+        label,
+        data=data,
+        file_name=Path(relative_name).name,
+        mime=mime,
+        key=f"dl_{relative_name}",
+    )
+
+
 def _show_f_result(project_id: str) -> None:
     config = _config()
     project_dir = config.projects_root / project_id
-    st.success("F: Kdenlive 골격이 생성됐습니다.")
-    st.write("이 파일을 Kdenlive에서 열어 편집을 마무리하세요:")
+    st.success("F: 초안이 완성됐습니다. Kdenlive에서 열어 마무리하세요.")
+
+    st.subheader("다음 할 일")
+    st.markdown(
+        "1. 프로젝트 폴더에서 `assets/user_images/`의 플레이스홀더를 권리처리된 이미지로 교체\n"
+        "2. `project.kdenlive`를 Kdenlive에서 열기\n"
+        "3. 내레이션 녹음·자막·컷 편집으로 마무리 (이 도구는 렌더·업로드하지 않음)"
+    )
+
+    st.write("프로젝트 폴더:")
+    st.code(str(project_dir))
+    st.write("Kdenlive 프로젝트 파일:")
     st.code(str(project_dir / "project.kdenlive"))
-    st.write("핸드오프 노트:")
-    st.code(str(project_dir / "notes" / "manual_kdenlive_editing.md"))
+
+    _download_button(
+        project_id, "project.kdenlive", "project.kdenlive 다운로드", "application/xml"
+    )
+    _download_button(
+        project_id,
+        "notes/manual_kdenlive_editing.md",
+        "핸드오프 노트 다운로드",
+        "text/markdown",
+    )
 
 
 def _regenerate_actions(project_id: str) -> None:
