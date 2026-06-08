@@ -379,11 +379,27 @@ def _discovery_wizard() -> None:
     if chosen.get("excerpt"):
         st.caption(chosen["excerpt"])
 
-    st.subheader("3) 초안 생성")
-    st.caption("선택한 후보로 요약·훅을 자동 초안하고 A→F 전체 초안을 한 번에 만듭니다.")
-    if st.button("이 후보로 전체 초안 생성 (A→F)"):
+    st.subheader("3) 초안 다듬기")
+    st.caption("자동 초안된 제목·요약·훅을 자유롭게 고친 뒤, 그 내용으로 A→F 전체 초안을 만듭니다.")
+    seed = ctrl.draft_fields_from_discovered(chosen)
+    with st.form("draft_edit"):
+        edited_title = st.text_input("제목", value=seed["title"], key=f"draft_title_{picked}")
+        edited_summary = st.text_area("요약", value=seed["summary"], key=f"draft_summary_{picked}")
+        edited_hook = st.text_input("훅", value=seed["hook"], key=f"draft_hook_{picked}")
+        edited_why = st.text_input(
+            "숏폼 적합 이유", value=seed["why_shortable"], key=f"draft_why_{picked}"
+        )
+        submitted = st.form_submit_button("이 내용으로 전체 초안 생성 (A→F)")
+    if submitted:
         try:
-            candidate = ctrl.draft_candidate_from_discovered(chosen)
+            candidate = ctrl.candidate_from_fields(
+                source_url=str(chosen.get("url") or ""),
+                source=str(chosen.get("source") or ""),
+                title=edited_title,
+                summary=edited_summary,
+                hook=edited_hook,
+                why_shortable=edited_why,
+            )
             with st.spinner("초안 생성 중 (렌더·업로드 없음)..."):
                 result = ctrl.run_full_pipeline(_config(), candidate)
             st.session_state["project_id"] = result["project_id"]

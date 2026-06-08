@@ -223,10 +223,13 @@ def test_ui_wizard_discovers_then_drafts_to_f(tmp_path, monkeypatch) -> None:
     at = _click(_fresh(tmp_path), "지금 가져오기")
     assert not at.exception
 
-    at = _click(at, "이 후보로 전체 초안 생성")
+    # The draft-edit form is pre-filled; edit the title, then generate.
+    at.text_input[1].set_value("내가 고친 제목")
+    at = _click(at, "이 내용으로 전체 초안 생성")
     assert not at.exception
     project_id = at.session_state["project_id"]
     assert ctrl.current_status(cfg, project_id) == "script_generated"
+    assert ctrl.load_candidate(cfg, project_id)["title"] == "내가 고친 제목"
 
 
 def test_ui_provider_panel_shows_enable_guidance(tmp_path, monkeypatch) -> None:
