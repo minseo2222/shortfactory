@@ -50,6 +50,8 @@ from shorts_pipeline.sources import (
     SingleLinkFetchProvider,
     SourceError,
     YouTubeSourceProvider,
+    naver_enabled,
+    youtube_enabled,
 )
 
 Clock = Callable[[], datetime] | None
@@ -251,6 +253,20 @@ def load_f_manifest(config: PipelineConfig, project_id: str) -> FKdenliveManifes
     return _load_artifact(config, project_id, "f_kdenlive_manifest.json", FKdenliveManifest)
 
 
+def read_project_file(config: PipelineConfig, project_id: str, relative_name: str) -> bytes | None:
+    """Read one project file's bytes for download, or None if it is absent.
+
+    Path-guarded: the relative name is validated and resolved under the project
+    directory, so only files inside the project folder can be read.
+    """
+    project_dir = Path(config.projects_root) / project_id
+    safe_relative = ensure_relative_project_path(relative_name)
+    target = ensure_path_under_root(project_dir, project_dir / safe_relative)
+    if not target.is_file():
+        return None
+    return target.read_bytes()
+
+
 def load_candidate(config: PipelineConfig, project_id: str) -> dict[str, Any] | None:
     """Reconstruct an editable candidate dict from the stored source.json.
 
@@ -325,6 +341,23 @@ def store_user_image(
 SOURCE_KINDS = ("rss", "link", "youtube", "naver")
 
 
+def source_readiness() -> dict[str, dict[str, Any]]:
+    """Per-source readiness for the wizard (presence only, never key values).
+
+    rss/link need no key; youtube/naver report whether their env keys are
+    present, plus the env var *names* the user must set if not.
+    """
+    return {
+        "rss": {"ready": True, "needs": []},
+        "link": {"ready": True, "needs": []},
+        "youtube": {"ready": youtube_enabled(), "needs": ["YOUTUBE_API_KEY"]},
+        "naver": {
+            "ready": naver_enabled(),
+            "needs": ["NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"],
+        },
+    }
+
+
 def discover_candidates(kind: str, query: str = "") -> list[DiscoveredCandidate]:
     """Run one discovery provider by kind and return bounded candidates.
 
@@ -344,29 +377,69 @@ def discover_candidates(kind: str, query: str = "") -> list[DiscoveredCandidate]
     return provider.discover(query)
 
 
-def draft_candidate_from_discovered(discovered: Mapping[str, Any]) -> dict[str, Any]:
-    """Turn a discovered item into an editable candidate dict for A->F.
+_DRAFT_WHY = "사용자가 고른 화제 후보입니다."
 
-    Only the bounded title/url/source/excerpt feed the draft - no full body.
-    The summary/hook are auto-filled and meant to be edited by the user.
+
+def draft_fields_from_discovered(discovered: Mapping[str, Any]) -> dict[str, str]:
+    """Auto-draft the editable fields (title/summary/hook/why) for one item.
+
+    Deterministic template from the bounded title/excerpt only (no full body).
+    The result seeds an editable form; the user can rewrite any field before
+    generating. A real-LLM refine is an optional future enhancement.
     """
     title = (str(discovered.get("title") or "")).strip() or "제목 없음"
-    url = str(discovered.get("url") or "")
-    source = (str(discovered.get("source") or "")).strip() or "discovery"
     excerpt = (str(discovered.get("excerpt") or "")).strip()
+    return {
+        "title": title[:200],
+        "summary": (excerpt or title)[:500],
+        "hook": title[:60],
+        "why_shortable": _DRAFT_WHY,
+    }
+
+
+def candidate_from_fields(
+    *,
+    source_url: str,
+    source: str,
+    title: str,
+    summary: str,
+    hook: str,
+    why_shortable: str,
+) -> dict[str, Any]:
+    """Build a validated candidate dict from (possibly user-edited) fields.
+
+    Empty fields fall back to safe non-empty values so CandidateCard validation
+    always passes; every field is length-bounded.
+    """
+    clean_title = (title or "").strip() or "제목 없음"
+    clean_summary = (summary or "").strip() or clean_title
+    clean_hook = (hook or "").strip() or clean_title[:60]
+    clean_why = (why_shortable or "").strip() or _DRAFT_WHY
+    url = str(source_url or "")
+    src = (source or "").strip() or "discovery"
     slug = hashlib.sha256(url.encode("utf-8")).hexdigest()[:10]
     return {
         "candidate_id": f"disc-{slug}",
-        "title": title[:200],
+        "title": clean_title[:200],
         "source_url": url,
-        "community": source[:60],
+        "community": src[:60],
         "collected_at": "2026-01-01T00:00:00+09:00",
-        "summary": (excerpt or title)[:500],
-        "hook": title[:60],
-        "why_shortable": "사용자가 고른 화제 후보입니다.",
+        "summary": clean_summary[:500],
+        "hook": clean_hook[:60],
+        "why_shortable": clean_why[:300],
         "risk_flags_for_user": [],
         "status": "selected",
     }
+
+
+def draft_candidate_from_discovered(discovered: Mapping[str, Any]) -> dict[str, Any]:
+    """Turn a discovered item into an editable candidate dict for A->F."""
+    fields = draft_fields_from_discovered(discovered)
+    return candidate_from_fields(
+        source_url=str(discovered.get("url") or ""),
+        source=str(discovered.get("source") or ""),
+        **fields,
+    )
 
 
 # --- D image manifest payload construction ----------------------------------

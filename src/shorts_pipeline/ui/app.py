@@ -295,14 +295,45 @@ def _render_previews(project_id: str) -> None:
         st.warning(f"미리보기 불가: {exc}")
 
 
+def _download_button(project_id: str, relative_name: str, label: str, mime: str) -> None:
+    data = ctrl.read_project_file(_config(), project_id, relative_name)
+    if data is None:
+        return
+    st.download_button(
+        label,
+        data=data,
+        file_name=Path(relative_name).name,
+        mime=mime,
+        key=f"dl_{relative_name}",
+    )
+
+
 def _show_f_result(project_id: str) -> None:
     config = _config()
     project_dir = config.projects_root / project_id
-    st.success("F: Kdenlive 골격이 생성됐습니다.")
-    st.write("이 파일을 Kdenlive에서 열어 편집을 마무리하세요:")
+    st.success("F: 초안이 완성됐습니다. Kdenlive에서 열어 마무리하세요.")
+
+    st.subheader("다음 할 일")
+    st.markdown(
+        "1. 프로젝트 폴더에서 `assets/user_images/`의 플레이스홀더를 권리처리된 이미지로 교체\n"
+        "2. `project.kdenlive`를 Kdenlive에서 열기\n"
+        "3. 내레이션 녹음·자막·컷 편집으로 마무리 (이 도구는 렌더·업로드하지 않음)"
+    )
+
+    st.write("프로젝트 폴더:")
+    st.code(str(project_dir))
+    st.write("Kdenlive 프로젝트 파일:")
     st.code(str(project_dir / "project.kdenlive"))
-    st.write("핸드오프 노트:")
-    st.code(str(project_dir / "notes" / "manual_kdenlive_editing.md"))
+
+    _download_button(
+        project_id, "project.kdenlive", "project.kdenlive 다운로드", "application/xml"
+    )
+    _download_button(
+        project_id,
+        "notes/manual_kdenlive_editing.md",
+        "핸드오프 노트 다운로드",
+        "text/markdown",
+    )
 
 
 def _regenerate_actions(project_id: str) -> None:
@@ -347,17 +378,30 @@ def _discovery_wizard() -> None:
     )
     label = st.selectbox("소스", list(_SOURCE_CHOICES.keys()), key="disc_kind")
     kind, query_label, default = _SOURCE_CHOICES[label]
+
+    readiness = ctrl.source_readiness().get(kind, {"ready": True, "needs": []})
+    if not readiness["ready"]:
+        st.warning(
+            "이 소스는 키 설정이 필요합니다 — 환경변수 "
+            + ", ".join(readiness["needs"])
+            + " 를 설정하세요(값은 표시되지 않습니다)."
+        )
+    else:
+        st.caption("바로 사용 가능합니다." if kind in {"rss", "link"} else "키가 설정되어 사용 가능합니다.")
+
     query = ""
     if query_label:
         query = st.text_input(query_label, value=default, key="disc_query")
 
-    if st.button("지금 가져오기"):
+    if st.button("지금 가져오기", disabled=not readiness["ready"]):
         try:
             with st.spinner("가져오는 중..."):
                 found = ctrl.discover_candidates(kind, query)
             st.session_state["discovered"] = [c.model_dump() for c in found]
             if not found:
-                st.info("결과가 없습니다. 다른 소스나 검색어를 시도해 보세요.")
+                st.info(
+                    "결과가 없습니다. 다른 소스나 검색어를 시도하거나, 잠시 후 다시 시도해 보세요."
+                )
         except Exception as exc:
             st.session_state.pop("discovered", None)
             st.error(f"가져오기 실패: {_friendly_error(exc)}")
@@ -367,6 +411,7 @@ def _discovery_wizard() -> None:
         return
 
     st.subheader("2) 후보 선택")
+    st.caption(f"{len(discovered)}개 후보를 찾았습니다. 하나를 고르세요.")
     options = list(range(len(discovered)))
 
     def _fmt(index: int) -> str:
@@ -379,11 +424,27 @@ def _discovery_wizard() -> None:
     if chosen.get("excerpt"):
         st.caption(chosen["excerpt"])
 
-    st.subheader("3) 초안 생성")
-    st.caption("선택한 후보로 요약·훅을 자동 초안하고 A→F 전체 초안을 한 번에 만듭니다.")
-    if st.button("이 후보로 전체 초안 생성 (A→F)"):
+    st.subheader("3) 초안 다듬기")
+    st.caption("자동 초안된 제목·요약·훅을 자유롭게 고친 뒤, 그 내용으로 A→F 전체 초안을 만듭니다.")
+    seed = ctrl.draft_fields_from_discovered(chosen)
+    with st.form("draft_edit"):
+        edited_title = st.text_input("제목", value=seed["title"], key=f"draft_title_{picked}")
+        edited_summary = st.text_area("요약", value=seed["summary"], key=f"draft_summary_{picked}")
+        edited_hook = st.text_input("훅", value=seed["hook"], key=f"draft_hook_{picked}")
+        edited_why = st.text_input(
+            "숏폼 적합 이유", value=seed["why_shortable"], key=f"draft_why_{picked}"
+        )
+        submitted = st.form_submit_button("이 내용으로 전체 초안 생성 (A→F)")
+    if submitted:
         try:
-            candidate = ctrl.draft_candidate_from_discovered(chosen)
+            candidate = ctrl.candidate_from_fields(
+                source_url=str(chosen.get("url") or ""),
+                source=str(chosen.get("source") or ""),
+                title=edited_title,
+                summary=edited_summary,
+                hook=edited_hook,
+                why_shortable=edited_why,
+            )
             with st.spinner("초안 생성 중 (렌더·업로드 없음)..."):
                 result = ctrl.run_full_pipeline(_config(), candidate)
             st.session_state["project_id"] = result["project_id"]

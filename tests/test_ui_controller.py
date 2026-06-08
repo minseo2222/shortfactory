@@ -289,6 +289,68 @@ def test_discover_candidates_unknown_kind_raises() -> None:
         ctrl.discover_candidates("not-a-source", "x")
 
 
+def test_read_project_file_reads_and_guards(tmp_path) -> None:
+    config = make_config(tmp_path)
+    result = ctrl.run_full_pipeline(config, candidate(), clock=fixed_clock)
+    pid = result["project_id"]
+
+    data = ctrl.read_project_file(config, pid, "project.kdenlive")
+    assert data is not None and data.startswith(b"<?xml")
+    assert ctrl.read_project_file(config, pid, "does_not_exist.txt") is None
+
+    from shorts_pipeline.security import SecurityValidationError
+
+    with pytest.raises(SecurityValidationError):
+        ctrl.read_project_file(config, pid, "../escape.txt")
+
+
+def test_source_readiness_gates_keyed_sources(monkeypatch) -> None:
+    for name in ("YOUTUBE_API_KEY", "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"):
+        monkeypatch.delenv(name, raising=False)
+    readiness = ctrl.source_readiness()
+    assert readiness["rss"]["ready"] is True and readiness["link"]["ready"] is True
+    assert readiness["youtube"]["ready"] is False
+    assert "YOUTUBE_API_KEY" in readiness["youtube"]["needs"]
+    assert readiness["naver"]["ready"] is False
+
+    monkeypatch.setenv("YOUTUBE_API_KEY", "k")
+    assert ctrl.source_readiness()["youtube"]["ready"] is True
+
+
+def test_draft_fields_from_discovered_returns_editable_seed() -> None:
+    seed = ctrl.draft_fields_from_discovered(
+        {"title": "화제", "url": "https://x/1", "source": "rss", "excerpt": "발췌 요약"}
+    )
+    assert set(seed) == {"title", "summary", "hook", "why_shortable"}
+    assert seed["title"] == "화제" and seed["summary"] == "발췌 요약"
+
+
+def test_candidate_from_edited_fields_creates_project(tmp_path) -> None:
+    config = make_config(tmp_path)
+    candidate = ctrl.candidate_from_fields(
+        source_url="https://example.com/post/1",
+        source="rss",
+        title="내가 고친 제목",
+        summary="내가 고친 요약",
+        hook="내가 고친 훅",
+        why_shortable="이래서 숏폼감",
+    )
+    assert candidate["title"] == "내가 고친 제목"
+    project = ctrl.create_project(config, candidate, clock=fixed_clock)
+    assert ctrl.current_status(config, project.project_id) == "candidate_selected"
+    assert ctrl.load_candidate(config, project.project_id)["summary"] == "내가 고친 요약"
+
+
+def test_candidate_from_fields_fills_empty_fields() -> None:
+    # Empty user edits must fall back to safe non-empty values (CandidateCard
+    # requires min_length 1 on every text field).
+    candidate = ctrl.candidate_from_fields(
+        source_url="https://example.com/x", source="", title="", summary="", hook="", why_shortable=""
+    )
+    assert candidate["title"] and candidate["summary"] and candidate["hook"]
+    assert candidate["why_shortable"] and candidate["community"]
+
+
 def test_build_ready_d_payload_applies_overrides(tmp_path) -> None:
     config = make_config(tmp_path)
     project = ctrl.create_project(config, candidate(), clock=fixed_clock)

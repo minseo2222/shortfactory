@@ -223,10 +223,58 @@ def test_ui_wizard_discovers_then_drafts_to_f(tmp_path, monkeypatch) -> None:
     at = _click(_fresh(tmp_path), "지금 가져오기")
     assert not at.exception
 
-    at = _click(at, "이 후보로 전체 초안 생성")
+    # The draft-edit form is pre-filled; edit the title, then generate.
+    at.text_input[1].set_value("내가 고친 제목")
+    at = _click(at, "이 내용으로 전체 초안 생성")
     assert not at.exception
     project_id = at.session_state["project_id"]
     assert ctrl.current_status(cfg, project_id) == "script_generated"
+    assert ctrl.load_candidate(cfg, project_id)["title"] == "내가 고친 제목"
+
+
+def test_ui_handoff_screen_shows_checklist_and_downloads(tmp_path) -> None:
+    at = _click(_fresh(tmp_path), "전체 초안 생성 (A→F)")
+    project_id = at.session_state["project_id"]
+
+    at = _fresh(tmp_path, project_id)
+    assert not at.exception  # download widgets render without crashing
+    headings = " ".join(block.value for block in at.subheader)
+    markdown = " ".join(block.value for block in at.markdown)
+    assert "다음 할 일" in headings or "다음 할 일" in markdown
+    code = " ".join(block.value for block in at.code)
+    assert "project.kdenlive" in code
+
+
+def test_ui_wizard_empty_result_shows_message(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(ctrl, "discover_candidates", lambda kind, query="": [])
+    at = _click(_fresh(tmp_path), "지금 가져오기")
+    assert not at.exception
+    assert any("결과가 없습니다" in block.value for block in at.info)
+
+
+def test_ui_wizard_fetch_failure_shows_friendly_error(tmp_path, monkeypatch) -> None:
+    from shorts_pipeline.sources import SourceError
+
+    def _boom(kind, query=""):
+        raise SourceError("네트워크 요청 실패")
+
+    monkeypatch.setattr(ctrl, "discover_candidates", _boom)
+    at = _click(_fresh(tmp_path), "지금 가져오기")
+    assert not at.exception
+    assert any("가져오기 실패" in block.value for block in at.error)
+
+
+def test_ui_wizard_gates_unconfigured_source(tmp_path, monkeypatch) -> None:
+    for name in ("YOUTUBE_API_KEY", "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"):
+        monkeypatch.delenv(name, raising=False)
+    at = _fresh(tmp_path)
+    # Select the YouTube source, which needs a key that is not set.
+    at.selectbox[0].set_value("YouTube 인기영상 (KR)").run()
+    assert not at.exception
+    text = " ".join(block.value for block in (*at.warning, *at.markdown))
+    assert "YOUTUBE_API_KEY" in text
+    fetch = next(button for button in at.button if "지금 가져오기" in button.label)
+    assert fetch.disabled is True
 
 
 def test_ui_provider_panel_shows_enable_guidance(tmp_path, monkeypatch) -> None:
