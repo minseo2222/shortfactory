@@ -8,6 +8,7 @@ providers, and a real provider is used only when the explicit opt-in is set.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -41,6 +42,14 @@ from shorts_pipeline.security import (
     ensure_path_under_root,
     ensure_relative_project_path,
     validate_media_extension,
+)
+from shorts_pipeline.sources import (
+    DiscoveredCandidate,
+    NaverSearchSourceProvider,
+    RssSourceProvider,
+    SingleLinkFetchProvider,
+    SourceError,
+    YouTubeSourceProvider,
 )
 
 Clock = Callable[[], datetime] | None
@@ -309,6 +318,55 @@ def store_user_image(
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(data)
     return safe_relative.as_posix()
+
+
+# --- Source discovery (opt-in, legal) ---------------------------------------
+
+SOURCE_KINDS = ("rss", "link", "youtube", "naver")
+
+
+def discover_candidates(kind: str, query: str = "") -> list[DiscoveredCandidate]:
+    """Run one discovery provider by kind and return bounded candidates.
+
+    Network egress happens only here, only when the user triggers it. Providers
+    are opt-in (YouTube/Naver need keys) and never bypass blocks.
+    """
+    if kind == "rss":
+        provider = RssSourceProvider()
+    elif kind == "link":
+        provider = SingleLinkFetchProvider()
+    elif kind == "youtube":
+        provider = YouTubeSourceProvider()
+    elif kind == "naver":
+        provider = NaverSearchSourceProvider()
+    else:
+        raise SourceError(f"알 수 없는 소스 종류: {kind}")
+    return provider.discover(query)
+
+
+def draft_candidate_from_discovered(discovered: Mapping[str, Any]) -> dict[str, Any]:
+    """Turn a discovered item into an editable candidate dict for A->F.
+
+    Only the bounded title/url/source/excerpt feed the draft - no full body.
+    The summary/hook are auto-filled and meant to be edited by the user.
+    """
+    title = (str(discovered.get("title") or "")).strip() or "제목 없음"
+    url = str(discovered.get("url") or "")
+    source = (str(discovered.get("source") or "")).strip() or "discovery"
+    excerpt = (str(discovered.get("excerpt") or "")).strip()
+    slug = hashlib.sha256(url.encode("utf-8")).hexdigest()[:10]
+    return {
+        "candidate_id": f"disc-{slug}",
+        "title": title[:200],
+        "source_url": url,
+        "community": source[:60],
+        "collected_at": "2026-01-01T00:00:00+09:00",
+        "summary": (excerpt or title)[:500],
+        "hook": title[:60],
+        "why_shortable": "사용자가 고른 화제 후보입니다.",
+        "risk_flags_for_user": [],
+        "status": "selected",
+    }
 
 
 # --- D image manifest payload construction ----------------------------------

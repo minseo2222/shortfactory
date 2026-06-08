@@ -48,31 +48,31 @@ def test_ui_app_drives_full_a_to_f(tmp_path) -> None:
     cfg = ctrl.PipelineConfig.from_base_dir(tmp_path)
 
     # A: create a project from the candidate form (defaults are valid).
-    at = _click(_fresh(tmp_path), "Create project")
+    at = _click(_fresh(tmp_path), "프로젝트 생성")
     assert not at.exception
     project_id = at.session_state["project_id"]
     assert ctrl.current_status(cfg, project_id) == "candidate_selected"
 
     # B -> C: stage buttons.
-    at = _click(_fresh(tmp_path, project_id), "scene plan (B)")
+    at = _click(_fresh(tmp_path, project_id), "장면 계획 생성")
     assert not at.exception
     assert ctrl.current_status(cfg, project_id) == "planned"
 
-    at = _click(_fresh(tmp_path, project_id), "timeline and assets (C)")
+    at = _click(_fresh(tmp_path, project_id), "타임라인·에셋 컴파일")
     assert not at.exception
     assert ctrl.current_status(cfg, project_id) == "project_generated"
 
     # D: confirm the rights form (defaults keep all slots replaced + confirmed).
-    at = _click(_fresh(tmp_path, project_id), "Confirm D")
+    at = _click(_fresh(tmp_path, project_id), "D 확인")
     assert not at.exception
     assert ctrl.current_status(cfg, project_id) == "images_inserted"
 
     # E -> F.
-    at = _click(_fresh(tmp_path, project_id), "narration and titles (E)")
+    at = _click(_fresh(tmp_path, project_id), "내레이션·제목 생성")
     assert not at.exception
     assert ctrl.current_status(cfg, project_id) == "script_generated"
 
-    at = _click(_fresh(tmp_path, project_id), "Kdenlive skeleton (F)")
+    at = _click(_fresh(tmp_path, project_id), "Kdenlive 골격 생성")
     assert not at.exception
 
     project_dir = cfg.projects_root / project_id
@@ -96,24 +96,24 @@ def test_ui_unknown_project_renders_info_without_crash(tmp_path) -> None:
     at = _fresh(tmp_path, project_id="PRJ_20260101_9999")
     assert not at.exception
     # No status -> the app shows an informational message, not a crash.
-    assert any("No UI action" in block.value for block in at.info)
+    assert any("작업이 없습니다" in block.value for block in at.info)
 
 
 def test_ui_create_failure_renders_error(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(ctrl, "create_project", _raise)
-    at = _click(_fresh(tmp_path), "Create project")
+    at = _click(_fresh(tmp_path), "프로젝트 생성")
     assert not at.exception
-    assert any("Create failed" in block.value for block in at.error)
+    assert any("생성 실패" in block.value for block in at.error)
 
 
 def test_ui_stage_failure_renders_error(tmp_path, monkeypatch) -> None:
     # Create a real project first, then force the B stage to fail.
-    at = _click(_fresh(tmp_path), "Create project")
+    at = _click(_fresh(tmp_path), "프로젝트 생성")
     project_id = at.session_state["project_id"]
     monkeypatch.setattr(ctrl, "run_b", _raise)
-    at = _click(_fresh(tmp_path, project_id), "scene plan (B)")
+    at = _click(_fresh(tmp_path, project_id), "장면 계획 생성")
     assert not at.exception
-    assert any("failed" in block.value for block in at.error)
+    assert any("실패" in block.value for block in at.error)
 
 
 # --- U1: one-click full draft + provider readiness panel -------------------
@@ -121,7 +121,7 @@ def test_ui_stage_failure_renders_error(tmp_path, monkeypatch) -> None:
 
 def test_ui_one_click_full_draft_reaches_f(tmp_path) -> None:
     cfg = ctrl.PipelineConfig.from_base_dir(tmp_path)
-    at = _click(_fresh(tmp_path), "Generate full draft (A->F)")
+    at = _click(_fresh(tmp_path), "전체 초안 생성 (A→F)")
     assert not at.exception
     project_id = at.session_state["project_id"]
     assert ctrl.current_status(cfg, project_id) == "script_generated"
@@ -130,14 +130,14 @@ def test_ui_one_click_full_draft_reaches_f(tmp_path) -> None:
 
 def test_ui_previews_render_after_full_draft(tmp_path) -> None:
     # One-click to F, then a fresh render shows the B/E previews.
-    at = _click(_fresh(tmp_path), "Generate full draft (A->F)")
+    at = _click(_fresh(tmp_path), "전체 초안 생성 (A→F)")
     project_id = at.session_state["project_id"]
 
     at = _fresh(tmp_path, project_id)
     assert not at.exception
     markdown = " ".join(block.value for block in at.markdown)
     assert "s01" in markdown  # B scene plan preview
-    assert any("Recommended title" in block.value for block in at.success)  # E preview
+    assert any("추천 제목" in block.value for block in at.success)  # E preview
 
 
 def _candidate(n: int) -> dict:
@@ -167,17 +167,17 @@ def test_ui_lists_and_resumes_projects(tmp_path) -> None:
     assert any(first.project_id in label for label in labels)
     assert any(second.project_id in label for label in labels)
 
-    at = _click(_fresh(tmp_path), f"Open {first.project_id}")
+    at = _click(_fresh(tmp_path), f"{first.project_id} 열기")
     assert not at.exception
     assert at.session_state["project_id"] == first.project_id
 
 
 def test_ui_regenerate_creates_new_project(tmp_path) -> None:
     cfg = ctrl.PipelineConfig.from_base_dir(tmp_path)
-    at = _click(_fresh(tmp_path), "Generate full draft (A->F)")
+    at = _click(_fresh(tmp_path), "전체 초안 생성 (A→F)")
     original = at.session_state["project_id"]
 
-    at = _click(_fresh(tmp_path, original), "Regenerate as new draft")
+    at = _click(_fresh(tmp_path, original), "새 초안으로 재생성")
     assert not at.exception
     new_id = at.session_state["project_id"]
     assert new_id != original
@@ -185,10 +185,10 @@ def test_ui_regenerate_creates_new_project(tmp_path) -> None:
 
 
 def test_ui_edit_candidate_returns_to_prefilled_form(tmp_path) -> None:
-    at = _click(_fresh(tmp_path), "Generate full draft (A->F)")
+    at = _click(_fresh(tmp_path), "전체 초안 생성 (A→F)")
     pid = at.session_state["project_id"]
 
-    at = _click(_fresh(tmp_path, pid), "Edit candidate and restart")
+    at = _click(_fresh(tmp_path, pid), "후보 편집 후 다시 시작")
     assert not at.exception
     assert "project_id" not in at.session_state
     assert at.session_state["edit_candidate"]["title"]  # candidate stashed for editing
@@ -199,14 +199,34 @@ def test_ui_first_run_help_and_stage_hint(tmp_path) -> None:
     at = _fresh(tmp_path)
     assert not at.exception
     help_text = " ".join(block.value for block in at.markdown)
-    assert "How this works" in help_text or "finish in Kdenlive" in help_text
+    assert "Kdenlive에서 마무리" in help_text
 
-    # After creating a project, a per-stage "Next:" hint appears.
-    at = _click(_fresh(tmp_path), "Create project")
+    # After creating a project, a per-stage "다음:" hint appears.
+    at = _click(_fresh(tmp_path), "프로젝트 생성")
     project_id = at.session_state["project_id"]
     at = _fresh(tmp_path, project_id)
     assert not at.exception
-    assert any("Next:" in block.value for block in at.info)
+    assert any("다음:" in block.value for block in at.info)
+
+
+def test_ui_wizard_discovers_then_drafts_to_f(tmp_path, monkeypatch) -> None:
+    from shorts_pipeline.sources import DiscoveredCandidate
+
+    cfg = ctrl.PipelineConfig.from_base_dir(tmp_path)
+    fake = [
+        DiscoveredCandidate(
+            title="화제 후보 1", url="https://example.com/1", source="rss", excerpt="요약 발췌"
+        )
+    ]
+    monkeypatch.setattr(ctrl, "discover_candidates", lambda kind, query="": fake)
+
+    at = _click(_fresh(tmp_path), "지금 가져오기")
+    assert not at.exception
+
+    at = _click(at, "이 후보로 전체 초안 생성")
+    assert not at.exception
+    project_id = at.session_state["project_id"]
+    assert ctrl.current_status(cfg, project_id) == "script_generated"
 
 
 def test_ui_provider_panel_shows_enable_guidance(tmp_path, monkeypatch) -> None:

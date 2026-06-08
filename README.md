@@ -20,8 +20,11 @@ generates local project files for later manual editing in Kdenlive.
 
 ## Explicit Non-Goals
 
-- Automated community crawling or scraping by default.
-- Login, CAPTCHA, rate-limit, IP rotation, or header spoofing bypasses.
+- Automatic/mass crawling or HTML scraping of sites without an official API or
+  published feed. Opt-in assisted discovery is limited to official APIs
+  (YouTube, Naver), published RSS/Atom feeds, and single user-pasted links.
+- Login, CAPTCHA, rate-limit, IP rotation, or header spoofing bypasses;
+  ignoring robots.txt; or bulk copying of a site's database.
 - Storing full source posts or full comments.
 - Automated image insertion.
 - Automated TTS.
@@ -68,6 +71,26 @@ The Kdenlive file is self-generated from validated `timeline.json`,
 `d_image_manifest.json`, and `e_script.json`. It does not parse or trust
 external `.kdenlive` files, render video, run Kdenlive or melt, generate TTS, or
 upload anything. The project status remains `script_generated`.
+
+## 화제 자동 발굴 (assisted discovery)
+
+The local UI opens with a Korean single-screen wizard: **가져오기 → 후보 선택 →
+원클릭 초안(A→F)**. Sources (`src/shorts_pipeline/sources/`) are opt-in and
+lawful only:
+
+- **YouTube 인기영상 (KR)** - official YouTube Data API (`YOUTUBE_API_KEY`).
+- **네이버 검색/데이터랩** - official Naver APIs (`NAVER_CLIENT_ID` /
+  `NAVER_CLIENT_SECRET`).
+- **RSS 피드** - published RSS/Atom (Ruliweb `/rss`, Inven news, or any feed
+  URL); no key required.
+- **링크 1개** - one user-pasted public URL, fetched once after a robots.txt
+  check; no key required.
+
+Network egress happens only when you click "가져오기" (or run with real-LLM opt
+-in). There is no automatic crawling, no bypass of login/CAPTCHA/IP/rate-limit/
+headers, and only bounded metadata (title/URL/score/source/excerpt) is kept -
+never full bodies, comments, raw HTML, or PII. Check readiness (presence only,
+no values) with `python -m shorts_pipeline.dev_cli doctor --json`.
 
 ## Local UI
 

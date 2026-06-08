@@ -110,6 +110,16 @@ restrictions: null
   readiness report) CLI commands.
 - `src/shorts_pipeline/dev_fakes.py` - deterministic fake B and E providers for local smoke runs.
 - `src/shorts_pipeline/inspect.py` - read-only project inspection API.
+- `src/shorts_pipeline/sources/__init__.py` - source discovery package exports.
+- `src/shorts_pipeline/sources/base.py` - DiscoveredCandidate model, SourceProvider
+  protocol, injectable fetcher, and bounded text helpers (no full body/PII).
+- `src/shorts_pipeline/sources/rss.py` - RSS/Atom feed provider (published feeds only).
+- `src/shorts_pipeline/sources/single_link.py` - single user-pasted URL provider with a
+  robots.txt check and no bypass of login/CAPTCHA/Cloudflare walls.
+- `src/shorts_pipeline/sources/youtube.py` - opt-in YouTube Data API provider (KR
+  most-popular via a REST GET; key from env, never logged).
+- `src/shorts_pipeline/sources/naver.py` - opt-in Naver providers: search
+  (news/blog/cafe) and DataLab search-trend; Client ID/Secret from env, never logged.
 - `src/shorts_pipeline/llm/__init__.py` - LLM helper package marker.
 - `src/shorts_pipeline/llm/b_provider.py` - B provider protocol only.
 - `src/shorts_pipeline/llm/e_provider.py` - E provider protocol only.
@@ -164,6 +174,12 @@ restrictions: null
   `--accept-placeholders`, explicit-provider-choice guard, and supplied candidate JSON.
 - `tests/test_dev_cli_doctor.py` - `doctor` CLI: fake-when-unconfigured readiness, strict
   non-zero exit, and the guarantee that no API key value is ever printed.
+- `tests/test_sources_s1.py` - offline source discovery: RSS/Atom parsing and bounds,
+  single-link robots.txt respect, and no-bypass behavior on blocked pages.
+- `tests/test_sources_youtube_s2.py` - offline YouTube provider: KR most-popular URL,
+  normalization, key gate, transient retry, and no API-key leak into output.
+- `tests/test_sources_naver_s3.py` - offline Naver providers: search normalization and
+  auth headers, DataLab scoring and POST body, credential gate, and no-credential leak.
 - `tests/test_dev_inspect_cli.py` - read-only inspect CLI, mutation checks, missing DB/root,
   artifact problems, hash mismatch, unsafe paths, strict mode, and verification skip flags.
 - `tests/test_dev_cli_kdenlive.py` - dev Kdenlive CLI confirmation gate, JSON/human output,

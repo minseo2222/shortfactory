@@ -1,5 +1,24 @@
 # 03. Security and Policy
 
+## Source Discovery (assisted_discovery, opt-in)
+
+Discovery is on-demand (only when the user triggers it) and limited to lawful
+paths:
+
+- **Allowed**: official APIs (YouTube Data API; Naver search/DataLab), published
+  RSS/Atom feeds, and a single user-pasted public URL fetched once.
+- **Forbidden**: automatic/mass crawling or HTML scraping of sites without an
+  official API or feed; any bypass of login, CAPTCHA, IP blocks, rate limits, or
+  request headers; ignoring `robots.txt`; and bulk/systematic copying of a
+  site's database.
+- The single-link fetch checks `robots.txt` first (fail-closed when restricted)
+  and never works around a 401/403/Cloudflare wall - it just fails.
+- Only bounded metadata is retained: title, URL, score, source, and a
+  length-capped excerpt. Never full bodies, comments, raw HTML, screenshots, or
+  PII.
+- API keys/credentials are environment-only and are never logged, printed, or
+  returned in output. Tests and CI run fully offline with injected fakes.
+
 ## File Security
 
 Project files are generated only under the configured project root.
