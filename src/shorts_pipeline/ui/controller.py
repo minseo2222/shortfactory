@@ -490,24 +490,30 @@ def analyze_pasted_content(text: str, source_url: str = "") -> DiscoveredCandida
 
 
 def b_paste_prompt(
-    config: PipelineConfig, project_id: str, previous_errors: list[str] | None = None
+    config: PipelineConfig,
+    project_id: str,
+    previous_errors: list[str] | None = None,
+    tone: str | None = None,
 ) -> str:
     """Build the B prompt to paste into Claude Code / Codex (no API key)."""
-    from shorts_pipeline.llm.manual_paste import build_b_paste_prompt
+    from shorts_pipeline.llm.manual_paste import DEFAULT_TONE, build_b_paste_prompt
     from shorts_pipeline.models import SourceArtifact
 
     source = _load_artifact(config, project_id, "source.json", SourceArtifact)
     if source is None:
         raise ValueError("source.json이 없습니다. 먼저 후보로 프로젝트를 만드세요.")
-    return build_b_paste_prompt(source, previous_errors)
+    return build_b_paste_prompt(source, previous_errors, tone or DEFAULT_TONE)
 
 
 def e_paste_prompt(
-    config: PipelineConfig, project_id: str, previous_errors: list[str] | None = None
+    config: PipelineConfig,
+    project_id: str,
+    previous_errors: list[str] | None = None,
+    tone: str | None = None,
 ) -> str:
     """Build the E prompt to paste into Claude Code / Codex (no API key)."""
     from shorts_pipeline.e_service import build_e_generation_context
-    from shorts_pipeline.llm.manual_paste import build_e_paste_prompt
+    from shorts_pipeline.llm.manual_paste import DEFAULT_TONE, build_e_paste_prompt
     from shorts_pipeline.models import DImageManifest, SourceArtifact
 
     source = _load_artifact(config, project_id, "source.json", SourceArtifact)
@@ -516,7 +522,14 @@ def e_paste_prompt(
     if source is None or timeline is None or manifest is None:
         raise ValueError("E 프롬프트에는 source/timeline/D 매니페스트가 필요합니다(먼저 D까지 진행).")
     context = build_e_generation_context(source=source, timeline=timeline, d_manifest=manifest)
-    return build_e_paste_prompt(context, previous_errors)
+    return build_e_paste_prompt(context, previous_errors, tone or DEFAULT_TONE)
+
+
+def shorts_tones() -> list[str]:
+    """Available content tones for the paste prompt (default first)."""
+    from shorts_pipeline.llm.manual_paste import DEFAULT_TONE, TONE_PRESETS
+
+    return [DEFAULT_TONE] + [t for t in TONE_PRESETS if t != DEFAULT_TONE]
 
 
 def apply_pasted_b(config: PipelineConfig, project_id: str, raw_json: str, *, clock: Clock = None):

@@ -115,6 +115,14 @@ stages each offer a **Claude Code/Codex로 생성** panel:
 2. Paste it into your **Claude Code** or **Codex** session and run it.
 3. Paste the returned JSON back into the box and press **적용**.
 
+Each B/E panel also has a **톤(자극 강도)** selector — `자극적`(default), `정보`,
+`유머`, `감성`. The exported prompt carries a YouTube-Shorts craft playbook
+(0–2s hook, punchy on-screen text, fast pacing, curiosity gap/open loop,
+emotional angle, payoff, strong hook titles) so the result grabs attention —
+while the safety rules (no fabrication, defamation, crime assertions, source
+quotes, or PII) still bound it to fact-based curiosity/emotion. Pick the tone,
+copy the prompt, and your Claude Code output follows that style.
+
 The pasted JSON goes through the same validators as a real provider; on a
 validation error you get a retry prompt with the error appended. Until you do
 this, the pipeline runs in **더미(dummy)** mode whose generated titles/narration
