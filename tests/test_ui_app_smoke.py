@@ -345,6 +345,19 @@ def test_ui_paste_bridge_shows_tone_and_playbook(tmp_path) -> None:
     assert "톤=자극적" in code and "훅" in code
 
 
+def test_ui_paste_bridge_community_tone_reflects_in_prompt(tmp_path) -> None:
+    at = _click(_fresh(tmp_path), "프로젝트 생성")
+    pid = at.session_state["project_id"]
+    at = _fresh(tmp_path, pid)
+    # the community tone is offered in the selector
+    assert any("커뮤니티" in opt for sb in at.selectbox for opt in sb.options)
+    # selecting it re-parameterizes the exported prompt
+    at.selectbox[0].set_value("커뮤니티(반말·밈)").run()
+    assert not at.exception
+    code = " ".join(block.value for block in at.code)
+    assert "반말" in code and "비속어" in code
+
+
 def test_ui_paste_bridge_invalid_paste_shows_error(tmp_path) -> None:
     at = _click(_fresh(tmp_path), "프로젝트 생성")
     pid = at.session_state["project_id"]

@@ -190,6 +190,7 @@ def _paste_bridge(project_id: str, stage: str) -> None:
         tone = st.selectbox(
             "톤(자극 강도)", ctrl.shorts_tones(), key=f"tone_{stage}_{project_id}"
         )
+        st.caption("커뮤니티 톤은 반말·밈이지만, 비속어·비하·신상·날조는 자동으로 차단됩니다.")
         try:
             prompt = build_prompt(config, project_id, None, tone)
         except Exception as exc:
