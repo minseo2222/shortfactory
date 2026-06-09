@@ -115,8 +115,11 @@ stages each offer a **Claude Code/Codex로 생성** panel:
 2. Paste it into your **Claude Code** or **Codex** session and run it.
 3. Paste the returned JSON back into the box and press **적용**.
 
-Each B/E panel also has a **톤(자극 강도)** selector — `자극적`(default), `정보`,
-`유머`, `감성`. The exported prompt carries a YouTube-Shorts craft playbook
+Each B/E panel also has a **톤(자극 강도)** selector — `자극적`(default),
+`커뮤니티(반말·밈)`, `정보`, `유머`, `감성`. The community tone writes in a Korean
+internet-community register (반말, 밈 어미, 드립) for a Grok-like edge, but
+욕설·비속어·혐오·인신공격·특정인 비하·신상·날조 are barred — the safety rules and
+the E content guards reject any such output, so you get a retry instead. The exported prompt carries a YouTube-Shorts craft playbook
 (0–2s hook, punchy on-screen text, fast pacing, curiosity gap/open loop,
 emotional angle, payoff, strong hook titles) so the result grabs attention —
 while the safety rules (no fabrication, defamation, crime assertions, source
