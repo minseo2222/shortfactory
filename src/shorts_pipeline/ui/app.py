@@ -180,6 +180,41 @@ def _stage_button(label: str, action) -> None:
             st.error(f"{label} 실패: {_friendly_error(exc)}")
 
 
+def _paste_bridge(project_id: str, stage: str) -> None:
+    """No-API path: copy a prompt into Claude Code/Codex, paste the JSON back."""
+    config = _config()
+    title = "장면 계획 (B)" if stage == "b" else "내레이션·제목 (E)"
+    build_prompt = ctrl.b_paste_prompt if stage == "b" else ctrl.e_paste_prompt
+    apply = ctrl.apply_pasted_b if stage == "b" else ctrl.apply_pasted_e
+    with st.expander(f"🟦 Claude Code/Codex로 생성 (API 키 불필요) — {title}", expanded=True):
+        try:
+            prompt = build_prompt(config, project_id)
+        except Exception as exc:
+            st.warning(f"프롬프트를 만들 수 없습니다: {_friendly_error(exc)}")
+            return
+        st.caption(
+            "① 아래 프롬프트를 복사해 Claude Code/Codex에 붙여넣고 → ② 받은 JSON을 아래 칸에 "
+            "붙여넣은 뒤 → ③ 적용을 누르세요. (네트워크·API 키를 쓰지 않습니다.)"
+        )
+        st.code(prompt)
+        pasted = st.text_area(
+            "받은 JSON 붙여넣기", key=f"paste_{stage}_{project_id}", height=160
+        )
+        if st.button("적용", key=f"apply_{stage}_{project_id}"):
+            try:
+                apply(config, project_id, pasted)
+                st.success("적용되었습니다.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"적용 실패: {_friendly_error(exc)}")
+                try:
+                    retry = build_prompt(config, project_id, [str(exc)])
+                    st.caption("아래 재시도 프롬프트(오류 포함)를 다시 붙여넣어 보세요:")
+                    st.code(retry)
+                except Exception:
+                    pass
+
+
 def _d_form(project_id: str) -> None:
     st.subheader("D. 이미지 삽입·권리 확인")
     st.write(
@@ -425,7 +460,10 @@ def _discovery_wizard() -> None:
         st.caption(chosen["excerpt"])
 
     st.subheader("3) 초안 다듬기")
-    st.caption("자동 초안된 제목·요약·훅을 자유롭게 고친 뒤, 그 내용으로 A→F 전체 초안을 만듭니다.")
+    st.caption(
+        "자동 초안된 제목·요약·훅을 고친 뒤, Claude Code/Codex로 단계별 생성(권장, API 불필요) "
+        "하거나 더미로 한 번에 만들 수 있습니다."
+    )
     seed = ctrl.draft_fields_from_discovered(chosen)
     with st.form("draft_edit"):
         edited_title = st.text_input("제목", value=seed["title"], key=f"draft_title_{picked}")
@@ -434,8 +472,10 @@ def _discovery_wizard() -> None:
         edited_why = st.text_input(
             "숏폼 적합 이유", value=seed["why_shortable"], key=f"draft_why_{picked}"
         )
-        submitted = st.form_submit_button("이 내용으로 전체 초안 생성 (A→F)")
-    if submitted:
+        col_full, col_create = st.columns(2)
+        submit_create = col_create.form_submit_button("프로젝트 만들기 (Claude Code 단계별)")
+        submit_full = col_full.form_submit_button("이 내용으로 전체 초안 생성 (A→F, 더미)")
+    if submit_full or submit_create:
         try:
             candidate = ctrl.candidate_from_fields(
                 source_url=str(chosen.get("url") or ""),
@@ -445,11 +485,16 @@ def _discovery_wizard() -> None:
                 hook=edited_hook,
                 why_shortable=edited_why,
             )
-            with st.spinner("초안 생성 중 (렌더·업로드 없음)..."):
-                result = ctrl.run_full_pipeline(_config(), candidate)
-            st.session_state["project_id"] = result["project_id"]
+            if submit_full:
+                with st.spinner("초안 생성 중 (렌더·업로드 없음)..."):
+                    result = ctrl.run_full_pipeline(_config(), candidate)
+                st.session_state["project_id"] = result["project_id"]
+                st.success(f"초안 완료: {result['project_id']}")
+            else:
+                project = ctrl.create_project(_config(), candidate)
+                st.session_state["project_id"] = project.project_id
+                st.success(f"프로젝트 생성: {project.project_id} — 아래 단계에서 Claude Code로 생성하세요.")
             st.session_state.pop("discovered", None)
-            st.success(f"초안 완료: {result['project_id']}")
             st.rerun()
         except Exception as exc:
             st.error(f"초안 생성 실패: {_friendly_error(exc)}")
@@ -479,13 +524,15 @@ def main() -> None:
     _render_previews(project_id)
 
     if status == "candidate_selected":
-        _stage_button("장면 계획 생성 (B)", lambda: ctrl.run_b(config, project_id))
+        _paste_bridge(project_id, "b")
+        _stage_button("장면 계획 생성 (B, 더미)", lambda: ctrl.run_b(config, project_id))
     elif status == "planned":
         _stage_button("타임라인·에셋 컴파일 (C)", lambda: ctrl.run_c(config, project_id))
     elif status in {"project_generated", "waiting_for_user_images"}:
         _d_form(project_id)
     elif status == "images_inserted":
-        _stage_button("내레이션·제목 생성 (E)", lambda: ctrl.run_e(config, project_id))
+        _paste_bridge(project_id, "e")
+        _stage_button("내레이션·제목 생성 (E, 더미)", lambda: ctrl.run_e(config, project_id))
     elif status == "script_generated":
         if (config.projects_root / project_id / "project.kdenlive").exists():
             _show_f_result(project_id)

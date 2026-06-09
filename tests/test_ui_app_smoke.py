@@ -264,6 +264,41 @@ def test_ui_wizard_fetch_failure_shows_friendly_error(tmp_path, monkeypatch) -> 
     assert any("가져오기 실패" in block.value for block in at.error)
 
 
+def test_ui_paste_bridge_b_applies_to_planned(tmp_path) -> None:
+    import json as _json
+
+    from shorts_pipeline.dev_fakes import DevFakeBProvider
+    from shorts_pipeline.models import SourceArtifact
+
+    cfg = ctrl.PipelineConfig.from_base_dir(tmp_path)
+    at = _click(_fresh(tmp_path), "프로젝트 생성")
+    pid = at.session_state["project_id"]
+
+    source = SourceArtifact.model_validate_json(
+        (cfg.projects_root / pid / "source.json").read_text(encoding="utf-8")
+    )
+    b_json = _json.dumps(
+        DevFakeBProvider().generate(source=source, prompt_version="v", previous_errors=[])
+    )
+
+    at = _fresh(tmp_path, pid)
+    at.text_area[0].set_value(b_json).run()
+    at = _click(at, "적용")
+    assert not at.exception
+    assert ctrl.current_status(cfg, pid) == "planned"
+
+
+def test_ui_paste_bridge_invalid_paste_shows_error(tmp_path) -> None:
+    at = _click(_fresh(tmp_path), "프로젝트 생성")
+    pid = at.session_state["project_id"]
+
+    at = _fresh(tmp_path, pid)
+    at.text_area[0].set_value("이건 JSON이 아니에요 {{{").run()
+    at = _click(at, "적용")
+    assert not at.exception
+    assert any("적용 실패" in block.value for block in at.error)
+
+
 def test_ui_wizard_gates_unconfigured_source(tmp_path, monkeypatch) -> None:
     for name in ("YOUTUBE_API_KEY", "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET"):
         monkeypatch.delenv(name, raising=False)
