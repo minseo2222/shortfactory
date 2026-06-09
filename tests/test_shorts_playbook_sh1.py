@@ -75,6 +75,19 @@ def test_unknown_tone_falls_back_to_default() -> None:
     assert "톤=자극적" in prompt
 
 
+def test_b_playbook_suggests_more_scenes_for_pacing() -> None:
+    assert "6~10개" in _b_system_prompt()
+
+
+def test_dev_fake_demo_screen_text_is_korean() -> None:
+    from shorts_pipeline.dev_fakes import DevFakeBProvider
+
+    payload = DevFakeBProvider().generate(source=_source(), prompt_version="v", previous_errors=[])
+    texts = [scene["screen_text"] for scene in payload["scene_plan"]]
+    has_hangul = any(any("가" <= ch <= "힣" for ch in text) for text in texts)
+    assert has_hangul  # offline dummy preview now looks Korean
+
+
 def test_e_paste_prompt_builds_with_playbook() -> None:
     context = {
         "timeline_json": {"scenes": [{"scene_id": "s01", "duration_sec": 8.0,
