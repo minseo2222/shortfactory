@@ -264,6 +264,24 @@ def test_ui_wizard_fetch_failure_shows_friendly_error(tmp_path, monkeypatch) -> 
     assert any("가져오기 실패" in block.value for block in at.error)
 
 
+def test_ui_dummy_mode_notice_points_to_paste_bridge(tmp_path, monkeypatch) -> None:
+    for name in (
+        "SHORTS_PIPELINE_ENABLE_REAL_LLM",
+        "SHORTS_PIPELINE_LLM_BACKEND",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    at = _click(_fresh(tmp_path), "프로젝트 생성")
+    pid = at.session_state["project_id"]
+    at = _fresh(tmp_path, pid)
+    assert not at.exception
+    info = " ".join(block.value for block in at.info)
+    assert "더미" in info and "Claude Code" in info
+
+
 def test_ui_paste_bridge_b_applies_to_planned(tmp_path) -> None:
     import json as _json
 

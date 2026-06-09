@@ -97,6 +97,23 @@ headers, and only bounded metadata (title/URL/score/source/excerpt) is kept -
 never full bodies, comments, raw HTML, or PII. Check readiness (presence only,
 no values) with `python -m shorts_pipeline.dev_cli doctor --json`.
 
+## Claude Code / Codex로 초안 생성 (API 키 없이)
+
+You do not need a paid LLM API key. The B (scene plan) and E (narration/titles)
+stages each offer a **Claude Code/Codex로 생성** panel:
+
+1. Copy the shown prompt (it already contains the exact JSON schema, the safety
+   rules, and only the bounded Korean source — no URL/secret leaves the machine).
+2. Paste it into your **Claude Code** or **Codex** session and run it.
+3. Paste the returned JSON back into the box and press **적용**.
+
+The pasted JSON goes through the same validators as a real provider; on a
+validation error you get a retry prompt with the error appended. Until you do
+this, the pipeline runs in **더미(dummy)** mode whose generated titles/narration
+are placeholders (the UI says so). This is the recommended path for getting real
+Korean drafts without any API key. (The opt-in real-API adapters remain
+available but are not required.)
+
 ## Local UI
 
 A thin local Streamlit UI drives the manual A through F flow:

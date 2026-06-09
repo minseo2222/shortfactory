@@ -517,6 +517,11 @@ def main() -> None:
     config = _config()
     status = ctrl.current_status(config, project_id)
     st.write(f"현재 상태: `{status}`")
+    if ctrl.readiness()["mode"] == "fake":
+        st.info(
+            "ℹ️ 더미(예시) 모드입니다 — 생성되는 제목·내레이션은 예시입니다. B/E 단계의 "
+            "'Claude Code/Codex로 생성'에 프롬프트를 붙여넣으면 진짜 한국어 초안을 만들 수 있습니다(API 키 불필요)."
+        )
     hint = _STAGE_HINTS.get(status or "")
     if hint:
         st.info(f"다음: {hint}")
