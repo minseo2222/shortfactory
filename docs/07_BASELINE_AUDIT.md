@@ -188,6 +188,8 @@ restrictions: null
   B/E JSON validates through to planned/script_generated.
 - `tests/test_paste_analyze_pc1.py` - analyze_pasted_content: title/summary derivation,
   length bounds, URL handling, empty-input rejection, and flow into a project.
+- `tests/test_shorts_playbook_sh1.py` - the B/E prompts carry a Shorts hook/retention
+  playbook while keeping the safety rules, schema, and outbound minimization intact.
 - `tests/test_dev_inspect_cli.py` - read-only inspect CLI, mutation checks, missing DB/root,
   artifact problems, hash mismatch, unsafe paths, strict mode, and verification skip flags.
 - `tests/test_dev_cli_kdenlive.py` - dev Kdenlive CLI confirmation gate, JSON/human output,

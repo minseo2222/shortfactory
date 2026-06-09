@@ -346,11 +346,34 @@ _SHARED_SAFETY_RULES = (
 )
 
 
+_B_SHORTS_PLAYBOOK = (
+    "쇼츠 제작 지침(유튜브 쇼츠처럼 이목을 끌 것):\n"
+    "- 1번 장면은 0~2초 '훅': 강한 질문·패턴 인터럽트·궁금증 유발로 시작(절대 평범하게 시작 금지).\n"
+    "- screen_text는 펀치 있는 짧은 훅 단어/구(완전한 문장 지양). 예: '이게 말이 됨?', '끝까지 봐'.\n"
+    "- 빠른 페이싱: 장면을 짧게(가능하면 1.5~4초) 더 많이 쪼개 이탈을 막을 것(스키마 한도·총 30~60초 내).\n"
+    "- 오픈 루프(큐리오시티 갭): 결말을 중간에 미끼로 남겨 끝까지 보게 할 것.\n"
+    "- 감정 각도(분노/궁금/반전/공감/밈 중 하나)를 골라 일관되게 밀 것.\n"
+    "- 마지막 장면은 페이오프(한 방 결론/반전).\n"
+    "- 자극은 '사실 기반 호기심·감정 프레이밍'으로만. 아래 안전규칙을 절대 위반 금지(과장·날조·비방·범죄 단정 금지).\n"
+)
+
+_E_SHORTS_PLAYBOOK = (
+    "쇼츠 제작 지침(유튜브 쇼츠처럼 이목을 끌 것):\n"
+    "- 내레이션 첫 줄은 강한 훅(궁금증/반전 예고/의외의 사실). 짧고 구어체, 빠른 호흡.\n"
+    "- 리텐션 어구를 활용: '잠깐', '근데', '결국', '여기서 반전'.\n"
+    "- 각 줄은 다음 줄을 보게 만드는 미끼로 연결(오픈 루프).\n"
+    "- 제목 후보는 궁금증/반전/감정 각도로 강하게. recommended_title은 가장 클릭을 부르는 훅으로 선택.\n"
+    "- 자극은 '사실 기반 호기심·감정 프레이밍'으로만. 아래 안전규칙 준수(과장·날조·비방·범죄 단정·원문 인용 금지).\n"
+)
+
+
 def _b_system_prompt() -> str:
     schema = json.dumps(BScenePlan.model_json_schema(), ensure_ascii=False)
     return (
-        "You are a short-form video scene planner. Produce a safe, structured "
-        "b_scene_plan.v2.1 plan from the provided source metadata.\n"
+        "You are a short-form (YouTube Shorts) video scene planner. Produce an "
+        "attention-grabbing yet safe, structured b_scene_plan.v2.1 plan from the "
+        "provided source metadata.\n"
+        f"{_B_SHORTS_PLAYBOOK}\n"
         f"{_SHARED_SAFETY_RULES}\n"
         f"JSON schema:\n{schema}"
     )
@@ -359,9 +382,10 @@ def _b_system_prompt() -> str:
 def _e_system_prompt() -> str:
     schema = json.dumps(EScript.model_json_schema(), ensure_ascii=False)
     return (
-        "You are a short-form narration and title writer. Produce a safe, "
-        "structured e_script.v2.1 output from the provided timeline and image "
-        "context.\n"
+        "You are a short-form (YouTube Shorts) narration and title writer. "
+        "Produce an attention-grabbing yet safe, structured e_script.v2.1 output "
+        "from the provided timeline and image context.\n"
+        f"{_E_SHORTS_PLAYBOOK}\n"
         f"{_SHARED_SAFETY_RULES}\n"
         f"JSON schema:\n{schema}"
     )
