@@ -124,6 +124,9 @@ restrictions: null
 - `src/shorts_pipeline/llm/b_provider.py` - B provider protocol only.
 - `src/shorts_pipeline/llm/e_provider.py` - E provider protocol only.
 - `src/shorts_pipeline/llm/validators.py` - LLM-shaped artifact validation helpers and D readiness helper.
+- `src/shorts_pipeline/llm/manual_paste.py` - no-API Claude Code / Codex paste bridge:
+  prompt builders (reusing the real system prompt + outbound minimization) and
+  ManualPaste B/E providers that feed pasted JSON through the same validators.
 - `src/shorts_pipeline/llm/real_providers.py` - optional, opt-in real LLM adapters
   (OpenAI/Anthropic/Gemini) loaded dynamically via importlib; disabled by default and never
   called by tests, CI, or the default pipeline path.
@@ -180,6 +183,9 @@ restrictions: null
   normalization, key gate, transient retry, and no API-key leak into output.
 - `tests/test_sources_naver_s3.py` - offline Naver providers: search normalization and
   auth headers, DataLab scoring and POST body, credential gate, and no-credential leak.
+- `tests/test_manual_paste_cc1.py` - offline paste bridge: prompt builders include the
+  schema + bounded Korean source but not the URL, refuse secret markers, and pasted
+  B/E JSON validates through to planned/script_generated.
 - `tests/test_dev_inspect_cli.py` - read-only inspect CLI, mutation checks, missing DB/root,
   artifact problems, hash mismatch, unsafe paths, strict mode, and verification skip flags.
 - `tests/test_dev_cli_kdenlive.py` - dev Kdenlive CLI confirmation gate, JSON/human output,
