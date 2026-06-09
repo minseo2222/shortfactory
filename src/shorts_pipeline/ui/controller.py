@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from shorts_pipeline.b_service import generate_b_scene_plan
 from shorts_pipeline.c_service import compile_c_project
@@ -439,6 +440,49 @@ def draft_candidate_from_discovered(discovered: Mapping[str, Any]) -> dict[str, 
         source_url=str(discovered.get("url") or ""),
         source=str(discovered.get("source") or ""),
         **fields,
+    )
+
+
+# --- Paste-to-shorts: analyze copied text into a bounded candidate ----------
+
+_PASTE_INPUT_CAP = 20000  # never process more than this many chars
+_PASTE_TITLE_MAX = 80
+_PASTE_EXCERPT_MAX = 500
+
+
+def _clean_pasted_text(text: str) -> str:
+    raw = (text or "")[:_PASTE_INPUT_CAP]
+    cleaned = "".join(ch for ch in raw if ch in "\n\t" or ord(ch) >= 32)
+    return cleaned.strip()
+
+
+def analyze_pasted_content(text: str, source_url: str = "") -> DiscoveredCandidate:
+    """Analyze user-pasted copied text into a bounded shorts candidate.
+
+    Pure local analysis - no network. Keeps only bounded derived fields (title,
+    short summary), never the full raw text. The user pastes content they copied
+    while reading (e.g. a DCInside/Ruliweb post); the tool converts it, it does
+    not crawl.
+    """
+    cleaned = _clean_pasted_text(text)
+    if not cleaned:
+        raise ValueError("붙여넣은 내용이 비어 있습니다.")
+
+    lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
+    title = (lines[0] if lines else cleaned)[:_PASTE_TITLE_MAX] or "붙여넣은 화제"
+    summary = " ".join(cleaned.split())[:_PASTE_EXCERPT_MAX]
+
+    url = (source_url or "").strip()
+    parsed = urlparse(url) if url else None
+    if not (parsed and parsed.scheme in {"http", "https"} and parsed.netloc):
+        slug = hashlib.sha256(title.encode("utf-8")).hexdigest()[:10]
+        url = f"https://pasted.local/{slug}"
+
+    return DiscoveredCandidate(
+        title=title,
+        url=url,
+        source="paste",
+        excerpt=summary,
     )
 
 

@@ -220,7 +220,9 @@ def test_ui_wizard_discovers_then_drafts_to_f(tmp_path, monkeypatch) -> None:
     ]
     monkeypatch.setattr(ctrl, "discover_candidates", lambda kind, query="": fake)
 
-    at = _click(_fresh(tmp_path), "지금 가져오기")
+    at = _fresh(tmp_path)
+    at.selectbox[0].set_value("RSS 피드 (루리웹·인벤·임의 피드)").run()
+    at = _click(at, "지금 가져오기")
     assert not at.exception
 
     # The draft-edit form is pre-filled; edit the title, then generate.
@@ -245,9 +247,33 @@ def test_ui_handoff_screen_shows_checklist_and_downloads(tmp_path) -> None:
     assert "project.kdenlive" in code
 
 
+def test_ui_paste_mode_analyzes_and_creates_project(tmp_path) -> None:
+    cfg = ctrl.PipelineConfig.from_base_dir(tmp_path)
+    at = _fresh(tmp_path)  # default source is "내용 붙여넣기"
+    at.text_area[0].set_value("디시 실베 화제 제목\n핵심 요약 내용입니다.").run()
+    at = _click(at, "분석하기")
+    assert not at.exception
+
+    at = _click(at, "프로젝트 만들기")  # Claude Code 단계별
+    assert not at.exception
+    pid = at.session_state["project_id"]
+    assert ctrl.current_status(cfg, pid) == "candidate_selected"
+    assert ctrl.load_candidate(cfg, pid)["title"] == "디시 실베 화제 제목"
+
+
+def test_ui_paste_mode_empty_shows_error(tmp_path) -> None:
+    at = _fresh(tmp_path)
+    at.text_area[0].set_value("   ").run()
+    at = _click(at, "분석하기")
+    assert not at.exception
+    assert any("분석 실패" in block.value for block in at.error)
+
+
 def test_ui_wizard_empty_result_shows_message(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(ctrl, "discover_candidates", lambda kind, query="": [])
-    at = _click(_fresh(tmp_path), "지금 가져오기")
+    at = _fresh(tmp_path)
+    at.selectbox[0].set_value("RSS 피드 (루리웹·인벤·임의 피드)").run()
+    at = _click(at, "지금 가져오기")
     assert not at.exception
     assert any("결과가 없습니다" in block.value for block in at.info)
 
@@ -259,7 +285,9 @@ def test_ui_wizard_fetch_failure_shows_friendly_error(tmp_path, monkeypatch) -> 
         raise SourceError("네트워크 요청 실패")
 
     monkeypatch.setattr(ctrl, "discover_candidates", _boom)
-    at = _click(_fresh(tmp_path), "지금 가져오기")
+    at = _fresh(tmp_path)
+    at.selectbox[0].set_value("RSS 피드 (루리웹·인벤·임의 피드)").run()
+    at = _click(at, "지금 가져오기")
     assert not at.exception
     assert any("가져오기 실패" in block.value for block in at.error)
 

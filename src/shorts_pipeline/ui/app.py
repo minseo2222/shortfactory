@@ -399,6 +399,7 @@ def _regenerate_actions(project_id: str) -> None:
 
 
 _SOURCE_CHOICES = {
+    "내용 붙여넣기 (디시·루리웹 등 복사한 글)": ("paste", "", ""),
     "RSS 피드 (루리웹·인벤·임의 피드)": ("rss", "RSS 피드 URL", "https://bbs.ruliweb.com/news/rss"),
     "링크 1개 (공개 글 주소)": ("link", "공개 글 링크 1개", ""),
     "YouTube 인기영상 (KR)": ("youtube", "", ""),
@@ -406,14 +407,23 @@ _SOURCE_CHOICES = {
 }
 
 
-def _discovery_wizard() -> None:
-    st.subheader("1) 화제 가져오기")
+def _paste_source_input() -> None:
     st.caption(
-        "공식 API·공개 RSS·내가 고른 링크로만 가져옵니다. 자동 크롤링·우회는 하지 않습니다."
+        "디시 실베·루리웹 등에서 읽은 글을 복사해 붙여넣으세요. 네트워크 호출 없이 로컬에서 "
+        "분석합니다(원문은 저장하지 않고 요약만 보관)."
     )
-    label = st.selectbox("소스", list(_SOURCE_CHOICES.keys()), key="disc_kind")
-    kind, query_label, default = _SOURCE_CHOICES[label]
+    pasted_text = st.text_area("복사한 글 내용", key="paste_content", height=200)
+    pasted_url = st.text_input("출처 URL (선택)", value="", key="paste_url")
+    if st.button("분석하기"):
+        try:
+            cand = ctrl.analyze_pasted_content(pasted_text, pasted_url)
+            st.session_state["discovered"] = [cand.model_dump()]
+        except Exception as exc:
+            st.session_state.pop("discovered", None)
+            st.error(f"분석 실패: {_friendly_error(exc)}")
 
+
+def _fetch_source_input(kind: str, query_label: str, default: str) -> None:
     readiness = ctrl.source_readiness().get(kind, {"ready": True, "needs": []})
     if not readiness["ready"]:
         st.warning(
@@ -424,9 +434,7 @@ def _discovery_wizard() -> None:
     else:
         st.caption("바로 사용 가능합니다." if kind in {"rss", "link"} else "키가 설정되어 사용 가능합니다.")
 
-    query = ""
-    if query_label:
-        query = st.text_input(query_label, value=default, key="disc_query")
+    query = st.text_input(query_label, value=default, key="disc_query") if query_label else ""
 
     if st.button("지금 가져오기", disabled=not readiness["ready"]):
         try:
@@ -440,6 +448,21 @@ def _discovery_wizard() -> None:
         except Exception as exc:
             st.session_state.pop("discovered", None)
             st.error(f"가져오기 실패: {_friendly_error(exc)}")
+
+
+def _discovery_wizard() -> None:
+    st.subheader("1) 화제 가져오기")
+    st.caption(
+        "내가 복사한 글을 붙여넣거나, 공식 API·공개 RSS·링크로 가져옵니다. "
+        "자동 크롤링·우회는 하지 않습니다."
+    )
+    label = st.selectbox("소스", list(_SOURCE_CHOICES.keys()), key="disc_kind")
+    kind, query_label, default = _SOURCE_CHOICES[label]
+
+    if kind == "paste":
+        _paste_source_input()
+    else:
+        _fetch_source_input(kind, query_label, default)
 
     discovered = st.session_state.get("discovered") or []
     if not discovered:

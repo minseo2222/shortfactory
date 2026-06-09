@@ -74,6 +74,14 @@ upload anything. The project status remains `script_generated`.
 
 ## 화제 자동 발굴 (assisted discovery)
 
+For sites without an official API/feed (e.g. 디시인사이드 실베, 루리웹 글), the
+recommended path is **copy-and-paste, not scraping**: pick the
+**내용 붙여넣기 (디시·루리웹 등 복사한 글)** source, paste the text you copied while
+reading, and press **분석하기**. The tool analyzes it **locally (no network)** into
+a bounded candidate (title + short summary; the full raw text is never stored)
+and continues into the same draft → A→F flow. There is no crawling and no
+bypass — you paste content you already have.
+
 The local UI opens with a Korean single-screen wizard: **가져오기 → 후보 선택 →
 초안 다듬기 → 초안 생성(A→F) → 핸드오프**. After choosing a candidate you can
 edit the auto-drafted 제목/요약/훅 before generating. Sources that need a key

@@ -186,6 +186,8 @@ restrictions: null
 - `tests/test_manual_paste_cc1.py` - offline paste bridge: prompt builders include the
   schema + bounded Korean source but not the URL, refuse secret markers, and pasted
   B/E JSON validates through to planned/script_generated.
+- `tests/test_paste_analyze_pc1.py` - analyze_pasted_content: title/summary derivation,
+  length bounds, URL handling, empty-input rejection, and flow into a project.
 - `tests/test_dev_inspect_cli.py` - read-only inspect CLI, mutation checks, missing DB/root,
   artifact problems, hash mismatch, unsafe paths, strict mode, and verification skip flags.
 - `tests/test_dev_cli_kdenlive.py` - dev Kdenlive CLI confirmation gate, JSON/human output,
