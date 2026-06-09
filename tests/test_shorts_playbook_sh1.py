@@ -75,6 +75,24 @@ def test_unknown_tone_falls_back_to_default() -> None:
     assert "톤=자극적" in prompt
 
 
+def test_community_tone_has_register_and_safety() -> None:
+    prompt = build_b_paste_prompt(_source(), tone="커뮤니티(반말·밈)")
+    # community register
+    assert "반말" in prompt and ("ㄹㅇ" in prompt or "ㅋㅋ" in prompt)
+    # explicit register-level prohibitions
+    assert "비속어" in prompt and "비하" in prompt and "신상" in prompt
+    # base safety rules still present
+    assert "Never invent numbers" in prompt and "Never mock or demean" in prompt
+
+
+def test_community_tone_is_offered_near_top() -> None:
+    from shorts_pipeline.ui import controller as ctrl
+
+    tones = ctrl.shorts_tones()
+    assert tones[0] == "자극적"
+    assert "커뮤니티(반말·밈)" in tones
+
+
 def test_b_playbook_suggests_more_scenes_for_pacing() -> None:
     assert "6~10개" in _b_system_prompt()
 
