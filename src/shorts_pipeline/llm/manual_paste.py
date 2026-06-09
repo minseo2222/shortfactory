@@ -31,6 +31,28 @@ _KOREAN_OUTPUT_RULE = (
     "위 스키마를 정확히 따르는 JSON 객체 하나만 출력하세요. 설명·코드펜스 금지."
 )
 
+DEFAULT_TONE = "자극적"
+TONE_PRESETS: dict[str, str] = {
+    "자극적": (
+        "톤=자극적: 가장 센 훅·궁금증·감정으로 끝까지 보게 만든다. "
+        "단 사실 기반으로만, 과장·날조·비방 금지."
+    ),
+    "정보": (
+        "톤=정보전달: 핵심 가치를 빠르게 압축하고 '이거 모르면 손해' 식 실용 훅을 쓴다. "
+        "정확하고 간결하게."
+    ),
+    "유머": (
+        "톤=유머: 위트·밈 감성·반전 개그로 가볍고 빠른 호흡. 조롱·비방은 금지."
+    ),
+    "감성": (
+        "톤=감성: 공감과 여운이 있는 스토리텔링, 따뜻한 한 줄로 마무리."
+    ),
+}
+
+
+def tone_block(tone: str | None) -> str:
+    return TONE_PRESETS.get((tone or "").strip() or DEFAULT_TONE, TONE_PRESETS[DEFAULT_TONE])
+
 
 class ManualPasteBScenePlanProvider:
     """B provider that returns a user-pasted payload for the service to validate."""
@@ -63,21 +85,25 @@ class ManualPasteEScriptProvider:
 
 
 def build_b_paste_prompt(
-    source: SourceArtifact, previous_errors: list[str] | None = None
+    source: SourceArtifact,
+    previous_errors: list[str] | None = None,
+    tone: str = DEFAULT_TONE,
 ) -> str:
     """Self-contained B prompt to paste into Claude Code / Codex."""
     minimal = minimize_b_source(source.model_dump(mode="json"))
     user = _user_prompt(minimal, previous_errors or [])
-    return f"{_b_system_prompt()}\n\n{user}\n\n{_KOREAN_OUTPUT_RULE}"
+    return f"{_b_system_prompt()}\n{tone_block(tone)}\n\n{user}\n\n{_KOREAN_OUTPUT_RULE}"
 
 
 def build_e_paste_prompt(
-    context: dict[str, Any], previous_errors: list[str] | None = None
+    context: dict[str, Any],
+    previous_errors: list[str] | None = None,
+    tone: str = DEFAULT_TONE,
 ) -> str:
     """Self-contained E prompt to paste into Claude Code / Codex."""
     minimal = minimize_e_context(context)
     user = _user_prompt(minimal, previous_errors or [])
-    return f"{_e_system_prompt()}\n\n{user}\n\n{_KOREAN_OUTPUT_RULE}"
+    return f"{_e_system_prompt()}\n{tone_block(tone)}\n\n{user}\n\n{_KOREAN_OUTPUT_RULE}"
 
 
 def parse_pasted_json(raw: str) -> dict[str, Any]:

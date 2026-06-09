@@ -334,6 +334,17 @@ def test_ui_paste_bridge_b_applies_to_planned(tmp_path) -> None:
     assert ctrl.current_status(cfg, pid) == "planned"
 
 
+def test_ui_paste_bridge_shows_tone_and_playbook(tmp_path) -> None:
+    at = _click(_fresh(tmp_path), "프로젝트 생성")
+    pid = at.session_state["project_id"]
+    at = _fresh(tmp_path, pid)
+    assert not at.exception
+    # tone selector present (default 자극적) and the prompt carries the playbook + tone
+    assert any("자극적" in opt for sb in at.selectbox for opt in sb.options)
+    code = " ".join(block.value for block in at.code)
+    assert "톤=자극적" in code and "훅" in code
+
+
 def test_ui_paste_bridge_invalid_paste_shows_error(tmp_path) -> None:
     at = _click(_fresh(tmp_path), "프로젝트 생성")
     pid = at.session_state["project_id"]

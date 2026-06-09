@@ -187,14 +187,17 @@ def _paste_bridge(project_id: str, stage: str) -> None:
     build_prompt = ctrl.b_paste_prompt if stage == "b" else ctrl.e_paste_prompt
     apply = ctrl.apply_pasted_b if stage == "b" else ctrl.apply_pasted_e
     with st.expander(f"🟦 Claude Code/Codex로 생성 (API 키 불필요) — {title}", expanded=True):
+        tone = st.selectbox(
+            "톤(자극 강도)", ctrl.shorts_tones(), key=f"tone_{stage}_{project_id}"
+        )
         try:
-            prompt = build_prompt(config, project_id)
+            prompt = build_prompt(config, project_id, None, tone)
         except Exception as exc:
             st.warning(f"프롬프트를 만들 수 없습니다: {_friendly_error(exc)}")
             return
         st.caption(
-            "① 아래 프롬프트를 복사해 Claude Code/Codex에 붙여넣고 → ② 받은 JSON을 아래 칸에 "
-            "붙여넣은 뒤 → ③ 적용을 누르세요. (네트워크·API 키를 쓰지 않습니다.)"
+            "① 톤을 고르고 → ② 아래 프롬프트를 복사해 Claude Code/Codex에 붙여넣고 → ③ 받은 "
+            "JSON을 아래 칸에 붙여넣은 뒤 → ④ 적용을 누르세요. (네트워크·API 키를 쓰지 않습니다.)"
         )
         st.code(prompt)
         pasted = st.text_area(
@@ -208,7 +211,7 @@ def _paste_bridge(project_id: str, stage: str) -> None:
             except Exception as exc:
                 st.error(f"적용 실패: {_friendly_error(exc)}")
                 try:
-                    retry = build_prompt(config, project_id, [str(exc)])
+                    retry = build_prompt(config, project_id, [str(exc)], tone)
                     st.caption("아래 재시도 프롬프트(오류 포함)를 다시 붙여넣어 보세요:")
                     st.code(retry)
                 except Exception:

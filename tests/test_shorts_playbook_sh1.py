@@ -58,6 +58,23 @@ def test_outbound_minimization_unchanged() -> None:
     assert "source_url" not in minimal and "project_id" not in minimal
 
 
+def test_tone_default_is_jaguk_and_presets_differ() -> None:
+    base = build_b_paste_prompt(_source())  # default
+    info = build_b_paste_prompt(_source(), tone="정보")
+    humor = build_b_paste_prompt(_source(), tone="유머")
+    assert "톤=자극적" in base
+    assert "톤=정보전달" in info and "톤=자극적" not in info
+    assert "톤=유머" in humor
+    # safety preserved under every tone
+    for prompt in (base, info, humor):
+        assert "Never invent numbers" in prompt
+
+
+def test_unknown_tone_falls_back_to_default() -> None:
+    prompt = build_b_paste_prompt(_source(), tone="없는톤")
+    assert "톤=자극적" in prompt
+
+
 def test_e_paste_prompt_builds_with_playbook() -> None:
     context = {
         "timeline_json": {"scenes": [{"scene_id": "s01", "duration_sec": 8.0,
