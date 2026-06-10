@@ -66,8 +66,10 @@ def _provider_panel() -> None:
     if info["real_enabled"] and not info["key_present"]:
         st.sidebar.warning("실제 LLM이 선택됐지만 설정이 완전하지 않습니다. 호출이 실패합니다.")
     else:
-        st.sidebar.caption("설정 전까지는 결정적 더미(오프라인)를 사용합니다.")
-    lines = ["실제 LLM을 켜려면 아래를 설정하세요(값은 표시되지 않습니다):"]
+        st.sidebar.caption(
+            "기본 경로: B/E 단계의 Claude Code/Codex 붙여넣기(API 키 불필요)."
+        )
+    lines = ["(선택) 실제 LLM API를 켜려면 아래를 설정하세요(값은 표시되지 않습니다):"]
     lines += [f"- {item}" for item in info["missing"]]
     st.sidebar.info("\n".join(lines))
 
@@ -183,6 +185,11 @@ def _stage_button(label: str, action) -> None:
 def _paste_bridge(project_id: str, stage: str) -> None:
     """No-API path: copy a prompt into Claude Code/Codex, paste the JSON back."""
     config = _config()
+    if ctrl.readiness()["mode"] == "fake":
+        st.info(
+            "ℹ️ 아래 더미 버튼은 예시 출력입니다. 진짜 한국어 초안은 이 패널에서 "
+            "프롬프트를 복사해 Claude Code/Codex에 붙여넣어 만드세요(API 키 불필요)."
+        )
     title = "장면 계획 (B)" if stage == "b" else "내레이션·제목 (E)"
     build_prompt = ctrl.b_paste_prompt if stage == "b" else ctrl.e_paste_prompt
     apply = ctrl.apply_pasted_b if stage == "b" else ctrl.apply_pasted_e
@@ -544,11 +551,6 @@ def main() -> None:
     config = _config()
     status = ctrl.current_status(config, project_id)
     st.write(f"현재 상태: `{status}`")
-    if ctrl.readiness()["mode"] == "fake":
-        st.info(
-            "ℹ️ 더미(예시) 모드입니다 — 생성되는 제목·내레이션은 예시입니다. B/E 단계의 "
-            "'Claude Code/Codex로 생성'에 프롬프트를 붙여넣으면 진짜 한국어 초안을 만들 수 있습니다(API 키 불필요)."
-        )
     hint = _STAGE_HINTS.get(status or "")
     if hint:
         st.info(f"다음: {hint}")

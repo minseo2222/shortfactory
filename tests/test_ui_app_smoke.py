@@ -310,6 +310,33 @@ def test_ui_dummy_mode_notice_points_to_paste_bridge(tmp_path, monkeypatch) -> N
     assert "더미" in info and "Claude Code" in info
 
 
+def test_ui_dummy_notice_absent_after_paste_applied(tmp_path) -> None:
+    # After real content is pasted for B, the C-stage screen must NOT claim the
+    # titles/narration are dummy examples (the old global banner was misleading).
+    import json as _json
+
+    from shorts_pipeline.dev_fakes import DevFakeBProvider
+    from shorts_pipeline.models import SourceArtifact
+
+    cfg = ctrl.PipelineConfig.from_base_dir(tmp_path)
+    at = _click(_fresh(tmp_path), "프로젝트 생성")
+    pid = at.session_state["project_id"]
+    source = SourceArtifact.model_validate_json(
+        (cfg.projects_root / pid / "source.json").read_text(encoding="utf-8")
+    )
+    b_json = _json.dumps(
+        DevFakeBProvider().generate(source=source, prompt_version="v", previous_errors=[])
+    )
+    at = _fresh(tmp_path, pid)
+    at.text_area[0].set_value(b_json).run()
+    at = _click(at, "적용")
+
+    at = _fresh(tmp_path, pid)  # now at the C stage
+    assert not at.exception
+    infos = " ".join(block.value for block in at.info)
+    assert "예시 출력" not in infos and "더미(예시) 모드" not in infos
+
+
 def test_ui_paste_bridge_b_applies_to_planned(tmp_path) -> None:
     import json as _json
 
