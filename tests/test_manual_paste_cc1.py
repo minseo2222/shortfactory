@@ -120,3 +120,28 @@ def test_e_paste_prompt_and_apply_reach_script_generated(tmp_path) -> None:
 
     ctrl.apply_pasted_e(config, pid, json.dumps(e_payload, ensure_ascii=False), clock=_CLOCK)
     assert ctrl.current_status(config, pid) == "script_generated"
+
+
+def test_apply_pasted_b_heals_missing_do_not_say(tmp_path) -> None:
+    # A pasted plan whose scenes omit the (schema-invisible) safety guard must
+    # still apply - the bridge injects the required guard instead of failing.
+    config, pid = _setup(tmp_path)
+    source = _load(config, pid, "source.json", SourceArtifact)
+    payload = DevFakeBProvider().generate(source=source, prompt_version="v", previous_errors=[])
+    for scene in payload["scene_plan"]:
+        scene["do_not_say"] = []
+    ctrl.apply_pasted_b(config, pid, json.dumps(payload, ensure_ascii=False), clock=_CLOCK)
+    assert ctrl.current_status(config, pid) == "planned"
+
+
+def test_apply_pasted_e_heals_forbidden_claims(tmp_path) -> None:
+    config, pid = _setup(tmp_path)
+    _to_images_inserted(config, pid)
+    source = _load(config, pid, "source.json", SourceArtifact)
+    timeline = _load(config, pid, "timeline.json", TimelineJson)
+    manifest = _load(config, pid, "d_image_manifest.json", DImageManifest)
+    context = build_e_generation_context(source=source, timeline=timeline, d_manifest=manifest)
+    e_payload = DevFakeEProvider().generate(context=context, prompt_version="v", previous_errors=[])
+    e_payload["forbidden_claims"] = []  # strip the required category warnings
+    ctrl.apply_pasted_e(config, pid, json.dumps(e_payload, ensure_ascii=False), clock=_CLOCK)
+    assert ctrl.current_status(config, pid) == "script_generated"

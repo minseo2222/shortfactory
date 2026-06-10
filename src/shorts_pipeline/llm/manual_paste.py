@@ -117,6 +117,60 @@ def build_e_paste_prompt(
     return f"{_e_system_prompt()}\n{tone_block(tone)}\n\n{user}\n\n{_KOREAN_OUTPUT_RULE}"
 
 
+def heal_b_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Inject a required safety-guard term into any B scene missing one.
+
+    The service requires each scene's do_not_say to carry a canonical guard
+    term, which the JSON schema does not express. Adding a prohibition is always
+    safe and never changes the user-facing script, so the paste bridge heals it
+    rather than failing the user on an invisible technicality.
+    """
+    from shorts_pipeline.b_service import SAFETY_GUARD_TERMS
+
+    if not isinstance(payload, dict):
+        return payload
+    scenes = payload.get("scene_plan")
+    if isinstance(scenes, list):
+        for scene in scenes:
+            if not isinstance(scene, dict):
+                continue
+            guards = list(scene.get("do_not_say") or [])
+            if not any(term in item for item in guards for term in SAFETY_GUARD_TERMS):
+                guards.append("범죄 단정")
+            scene["do_not_say"] = guards
+    return payload
+
+
+def heal_e_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Ensure forbidden_claims warns against every required category.
+
+    The service requires forbidden_claims to mention all canonical claim-guard
+    categories, which the schema does not express. Missing categories are
+    appended (safety-only, never alters titles/narration).
+    """
+    from shorts_pipeline.e_service import CLAIM_GUARD_CATEGORIES
+
+    if not isinstance(payload, dict):
+        return payload
+    claims = [str(c) for c in (payload.get("forbidden_claims") or [])]
+    _phrases = {
+        "real names or nicknames": "실명·닉네임 추론 금지",
+        "personal information": "개인정보 노출 금지",
+        "crime assertion": "범죄 단정 금지",
+        "fabricated numbers": "허위 수치 금지",
+        "direct source quotation": "원문 직접 인용 금지",
+        "original screenshot/capture reuse": "원본 캡처 재사용 금지",
+    }
+    joined = " ".join(claims).casefold()
+    for label, terms in CLAIM_GUARD_CATEGORIES:
+        if not any(term.casefold() in joined for term in terms):
+            addition = _phrases.get(label, label)
+            claims.append(addition)
+            joined += " " + addition.casefold()
+    payload["forbidden_claims"] = claims
+    return payload
+
+
 def parse_pasted_json(raw: str) -> dict[str, Any]:
     """Tolerantly parse pasted model output into a single JSON object.
 

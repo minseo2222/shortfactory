@@ -367,6 +367,21 @@ _E_SHORTS_PLAYBOOK = (
 )
 
 
+_B_FIELD_REQUIREMENTS = (
+    "필드 필수 규칙(검증 통과용):\n"
+    "- 각 장면 do_not_say는 비우지 말고, 다음 중 최소 1개를 반드시 포함하라: "
+    "실명, 닉네임, 개인정보, 범죄 단정, 허위 수치, 원문 직접 인용.\n"
+    "- 각 장면 source_basis는 입력 근거에서 최소 1개를 적어라."
+)
+
+_E_FIELD_REQUIREMENTS = (
+    "필드 필수 규칙(검증 통과용):\n"
+    "- forbidden_claims에는 다음 6가지를 모두 경고 항목으로 포함하라: "
+    "실명/닉네임, 개인정보, 범죄, 허위 수치, 원문 직접 인용, 원본 캡처.\n"
+    "- 각 narration_script 줄은 fact_basis를 최소 1개 포함하라."
+)
+
+
 def _b_system_prompt() -> str:
     schema = json.dumps(BScenePlan.model_json_schema(), ensure_ascii=False)
     return (
@@ -374,6 +389,7 @@ def _b_system_prompt() -> str:
         "attention-grabbing yet safe, structured b_scene_plan.v2.1 plan from the "
         "provided source metadata.\n"
         f"{_B_SHORTS_PLAYBOOK}\n"
+        f"{_B_FIELD_REQUIREMENTS}\n"
         f"{_SHARED_SAFETY_RULES}\n"
         f"JSON schema:\n{schema}"
     )
@@ -386,6 +402,7 @@ def _e_system_prompt() -> str:
         "Produce an attention-grabbing yet safe, structured e_script.v2.1 output "
         "from the provided timeline and image context.\n"
         f"{_E_SHORTS_PLAYBOOK}\n"
+        f"{_E_FIELD_REQUIREMENTS}\n"
         f"{_SHARED_SAFETY_RULES}\n"
         f"JSON schema:\n{schema}"
     )

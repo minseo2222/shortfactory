@@ -536,10 +536,11 @@ def apply_pasted_b(config: PipelineConfig, project_id: str, raw_json: str, *, cl
     """Validate and apply a pasted B scene-plan JSON via the manual provider."""
     from shorts_pipeline.llm.manual_paste import (
         ManualPasteBScenePlanProvider,
+        heal_b_payload,
         parse_pasted_json,
     )
 
-    payload = parse_pasted_json(raw_json)
+    payload = heal_b_payload(parse_pasted_json(raw_json))
     provider = ManualPasteBScenePlanProvider(payload)
     return run_b(config, project_id, provider=provider, clock=clock)
 
@@ -548,10 +549,11 @@ def apply_pasted_e(config: PipelineConfig, project_id: str, raw_json: str, *, cl
     """Validate and apply a pasted E script JSON via the manual provider."""
     from shorts_pipeline.llm.manual_paste import (
         ManualPasteEScriptProvider,
+        heal_e_payload,
         parse_pasted_json,
     )
 
-    payload = parse_pasted_json(raw_json)
+    payload = heal_e_payload(parse_pasted_json(raw_json))
     provider = ManualPasteEScriptProvider(payload)
     return run_e(config, project_id, provider=provider, clock=clock)
 
