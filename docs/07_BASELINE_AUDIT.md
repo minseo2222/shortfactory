@@ -124,6 +124,8 @@ restrictions: null
 - `src/shorts_pipeline/llm/b_provider.py` - B provider protocol only.
 - `src/shorts_pipeline/llm/e_provider.py` - E provider protocol only.
 - `src/shorts_pipeline/llm/validators.py` - LLM-shaped artifact validation helpers and D readiness helper.
+- `src/shorts_pipeline/llm/tone_variants.py` - 50 researched variant Shorts tone presets
+  (humor/issue/감성 structures) merged into the tone selector; data only.
 - `src/shorts_pipeline/llm/manual_paste.py` - no-API Claude Code / Codex paste bridge:
   prompt builders (reusing the real system prompt + outbound minimization) and
   ManualPaste B/E providers that feed pasted JSON through the same validators.
@@ -190,6 +192,8 @@ restrictions: null
   length bounds, URL handling, empty-input rejection, and flow into a project.
 - `tests/test_shorts_playbook_sh1.py` - the B/E prompts carry a Shorts hook/retention
   playbook while keeping the safety rules, schema, and outbound minimization intact.
+- `tests/test_tone_variants.py` - the 50 variant tone presets merge in without displacing
+  the base tones, keep the "톤=..." format, and flow into the exported prompt.
 - `tests/test_dev_inspect_cli.py` - read-only inspect CLI, mutation checks, missing DB/root,
   artifact problems, hash mismatch, unsafe paths, strict mode, and verification skip flags.
 - `tests/test_dev_cli_kdenlive.py` - dev Kdenlive CLI confirmation gate, JSON/human output,
