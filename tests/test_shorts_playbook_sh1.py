@@ -97,6 +97,23 @@ def test_b_playbook_suggests_more_scenes_for_pacing() -> None:
     assert "6~10개" in _b_system_prompt()
 
 
+def test_prompts_state_hidden_safety_field_requirements() -> None:
+    b = _b_system_prompt()
+    assert "do_not_say" in b and "범죄 단정" in b  # per-scene guard requirement
+    e = _e_system_prompt()
+    assert "forbidden_claims" in e and "원본 캡처" in e  # all 6 categories
+
+
+def test_heal_functions_inject_required_safety_terms() -> None:
+    from shorts_pipeline.llm.manual_paste import heal_b_payload, heal_e_payload
+
+    b = heal_b_payload({"scene_plan": [{"do_not_say": []}, {"do_not_say": ["아무거나"]}]})
+    assert all(scene["do_not_say"] for scene in b["scene_plan"])
+
+    e = heal_e_payload({"forbidden_claims": []})
+    assert len(e["forbidden_claims"]) >= 6
+
+
 def test_dev_fake_demo_screen_text_is_korean() -> None:
     from shorts_pipeline.dev_fakes import DevFakeBProvider
 
