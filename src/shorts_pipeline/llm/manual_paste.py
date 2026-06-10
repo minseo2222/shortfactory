@@ -24,6 +24,7 @@ from shorts_pipeline.llm.real_providers import (
     minimize_b_source,
     minimize_e_context,
 )
+from shorts_pipeline.llm.tone_variants import VARIANT_TONE_PRESETS
 from shorts_pipeline.models import SourceArtifact
 
 _KOREAN_OUTPUT_RULE = (
@@ -53,6 +54,11 @@ TONE_PRESETS: dict[str, str] = {
         "톤=감성: 공감과 여운이 있는 스토리텔링, 따뜻한 한 줄로 마무리."
     ),
 }
+
+# Researched variant presets (humor/issue/감성 structures) merged in. The five
+# base tones above stay first so 자극적 remains the default.
+for _name, _instruction in VARIANT_TONE_PRESETS.items():
+    TONE_PRESETS.setdefault(_name, _instruction)
 
 
 def tone_block(tone: str | None) -> str:
