@@ -251,7 +251,7 @@ def test_ui_paste_mode_analyzes_and_creates_project(tmp_path) -> None:
     cfg = ctrl.PipelineConfig.from_base_dir(tmp_path)
     at = _fresh(tmp_path)  # default source is "내용 붙여넣기"
     at.text_area[0].set_value("디시 실베 화제 제목\n핵심 요약 내용입니다.").run()
-    at = _click(at, "빠른 분석")
+    at = _click(at, "분석하기")
     assert not at.exception
 
     at = _click(at, "프로젝트 만들기")  # Claude Code 단계별
@@ -277,7 +277,7 @@ def test_ui_paste_mode_claude_code_analyze_applies(tmp_path) -> None:
 def test_ui_paste_mode_empty_shows_error(tmp_path) -> None:
     at = _fresh(tmp_path)
     at.text_area[0].set_value("   ").run()
-    at = _click(at, "빠른 분석")
+    at = _click(at, "분석하기")
     assert not at.exception
     assert any("분석 실패" in block.value for block in at.error)
 
