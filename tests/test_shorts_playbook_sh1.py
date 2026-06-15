@@ -104,6 +104,13 @@ def test_prompts_state_hidden_safety_field_requirements() -> None:
     assert "forbidden_claims" in e and "원본 캡처" in e  # all 6 categories
 
 
+def test_prompts_tell_model_to_distill_not_transcribe() -> None:
+    b = _b_system_prompt()
+    assert "원문" in b and "그대로 옮기지" in b  # B must reconstruct, not read verbatim
+    e = _e_system_prompt()
+    assert "원문을 그대로 읽지" in e
+
+
 def test_heal_functions_inject_required_safety_terms() -> None:
     from shorts_pipeline.llm.manual_paste import heal_b_payload, heal_e_payload
 
