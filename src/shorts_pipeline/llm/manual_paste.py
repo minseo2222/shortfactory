@@ -171,6 +171,28 @@ def heal_e_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+_ANALYZE_MAX_INPUT = 6000
+
+
+def build_analyze_prompt(pasted_text: str) -> str:
+    """Prompt to distill copied text into a hooky shorts candidate.
+
+    The user pastes this (with their copied post) into Claude Code/Codex; the
+    returned JSON is applied as a candidate. This is the no-API way to actually
+    extract the core/twist instead of reading the original verbatim.
+    """
+    text = (pasted_text or "").strip()[:_ANALYZE_MAX_INPUT]
+    return (
+        "아래 '원문'을 유튜브 쇼츠 후보로 분석하라.\n"
+        "- 가장 흥미로운 핵심·반전·웃음 포인트를 찾아라(원문을 그대로 옮기지 말 것).\n"
+        "- title: 클릭을 부르는 훅형 제목 한 줄(60자 이내, '~썰 푼다 ㅋㅋ' 같은 라벨 금지).\n"
+        "- summary: 핵심만 압축하되 반전/펀치라인을 반드시 포함(400자 이내, 구어체).\n"
+        "안전: 실명·닉네임·개인정보·신상·날조·비방·범죄 단정 금지(익명화).\n"
+        '반드시 {"title": "...", "summary": "..."} JSON 객체 하나만 출력하라. 설명·코드펜스 금지.\n\n'
+        f"원문:\n{text}"
+    )
+
+
 def parse_pasted_json(raw: str) -> dict[str, Any]:
     """Tolerantly parse pasted model output into a single JSON object.
 

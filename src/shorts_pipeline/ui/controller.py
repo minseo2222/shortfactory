@@ -456,6 +456,19 @@ def _clean_pasted_text(text: str) -> str:
     return cleaned.strip()
 
 
+def _bounded_excerpt(collapsed: str) -> str:
+    """Bound the excerpt while preserving the ending.
+
+    Community 썰 usually put the punchline/twist at the END, so when the text is
+    too long we keep the head AND the tail instead of cutting the ending off.
+    """
+    if len(collapsed) <= _PASTE_EXCERPT_MAX:
+        return collapsed
+    head = collapsed[:300].rstrip()
+    tail = collapsed[-180:].lstrip()
+    return f"{head} … {tail}"
+
+
 def analyze_pasted_content(text: str, source_url: str = "") -> DiscoveredCandidate:
     """Analyze user-pasted copied text into a bounded shorts candidate.
 
@@ -470,20 +483,44 @@ def analyze_pasted_content(text: str, source_url: str = "") -> DiscoveredCandida
 
     lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
     title = (lines[0] if lines else cleaned)[:_PASTE_TITLE_MAX] or "붙여넣은 화제"
-    summary = " ".join(cleaned.split())[:_PASTE_EXCERPT_MAX]
+    summary = _bounded_excerpt(" ".join(cleaned.split()))
+    return _build_paste_candidate(title, summary, source_url)
 
+
+def _build_paste_candidate(title: str, summary: str, source_url: str) -> DiscoveredCandidate:
     url = (source_url or "").strip()
     parsed = urlparse(url) if url else None
     if not (parsed and parsed.scheme in {"http", "https"} and parsed.netloc):
-        slug = hashlib.sha256(title.encode("utf-8")).hexdigest()[:10]
+        slug = hashlib.sha256((title or "paste").encode("utf-8")).hexdigest()[:10]
         url = f"https://pasted.local/{slug}"
-
     return DiscoveredCandidate(
-        title=title,
+        title=(title or "붙여넣은 화제")[:_PASTE_TITLE_MAX],
         url=url,
         source="paste",
-        excerpt=summary,
+        excerpt=summary[:_PASTE_EXCERPT_MAX],
     )
+
+
+def analyze_paste_prompt(text: str) -> str:
+    """Prompt to paste into Claude Code/Codex to distill copied text (no API)."""
+    from shorts_pipeline.llm.manual_paste import build_analyze_prompt
+
+    cleaned = _clean_pasted_text(text)
+    if not cleaned:
+        raise ValueError("먼저 글을 붙여넣으세요.")
+    return build_analyze_prompt(cleaned)
+
+
+def apply_analyzed(raw_json: str, source_url: str = "") -> DiscoveredCandidate:
+    """Apply a Claude Code-distilled {title, summary} JSON as a candidate."""
+    from shorts_pipeline.llm.manual_paste import parse_pasted_json
+
+    data = parse_pasted_json(raw_json)
+    title = str(data.get("title") or "").strip()
+    summary = str(data.get("summary") or "").strip()
+    if not summary:
+        raise ValueError("summary가 비어 있습니다. {title, summary} JSON을 확인하세요.")
+    return _build_paste_candidate(title or summary[:_PASTE_TITLE_MAX], summary, source_url)
 
 
 # --- No-API Claude Code / Codex paste bridge --------------------------------

@@ -421,11 +421,30 @@ _SOURCE_CHOICES = {
 def _paste_source_input() -> None:
     st.caption(
         "디시 실베·루리웹 등에서 읽은 글을 복사해 붙여넣으세요. 네트워크 호출 없이 로컬에서 "
-        "분석합니다(원문은 저장하지 않고 요약만 보관)."
+        "처리합니다(원문은 저장하지 않고 핵심만 보관)."
     )
     pasted_text = st.text_area("복사한 글 내용", key="paste_content", height=200)
     pasted_url = st.text_input("출처 URL (선택)", value="", key="paste_url")
-    if st.button("분석하기"):
+
+    with st.expander("🟦 Claude Code로 분석 (핵심·반전 추출, 권장)", expanded=True):
+        if not pasted_text.strip():
+            st.caption("먼저 위에 글을 붙여넣으세요.")
+        else:
+            st.caption(
+                "아래 프롬프트를 복사해 Claude Code/Codex에 붙여넣고, 받은 "
+                '{title, summary} JSON을 칸에 붙여넣은 뒤 "분석 적용"을 누르세요.'
+            )
+            st.code(ctrl.analyze_paste_prompt(pasted_text))
+            analyzed_json = st.text_area("받은 {title, summary} JSON", key="analyze_json", height=120)
+            if st.button("분석 적용"):
+                try:
+                    cand = ctrl.apply_analyzed(analyzed_json, pasted_url)
+                    st.session_state["discovered"] = [cand.model_dump()]
+                except Exception as exc:
+                    st.session_state.pop("discovered", None)
+                    st.error(f"분석 적용 실패: {_friendly_error(exc)}")
+
+    if st.button("빠른 분석 (자동, 핵심 추출은 약함)"):
         try:
             cand = ctrl.analyze_pasted_content(pasted_text, pasted_url)
             st.session_state["discovered"] = [cand.model_dump()]

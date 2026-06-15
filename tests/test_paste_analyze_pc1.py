@@ -54,3 +54,32 @@ def test_analyzed_candidate_flows_to_project(tmp_path) -> None:
     candidate = ctrl.draft_candidate_from_discovered(cand.model_dump())
     project = ctrl.create_project(config, candidate, clock=_CLOCK)
     assert ctrl.current_status(config, project.project_id) == "candidate_selected"
+
+
+def test_long_text_preserves_ending_punchline() -> None:
+    # The twist/punchline of a 썰 is usually at the end - it must survive bounding.
+    body = "도입부 설명 문장 " * 120  # comfortably > 500 chars before the ending
+    text = f"썰 제목\n{body}그리고 마지막에 진짜반전펀치라인이 있었다."
+    cand = ctrl.analyze_pasted_content(text)
+    assert len(cand.excerpt) <= 500
+    assert "진짜반전펀치라인" in cand.excerpt  # ending preserved
+    assert "…" in cand.excerpt  # head+tail elision marker
+
+
+def test_analyze_paste_prompt_distills_and_embeds_text() -> None:
+    prompt = ctrl.analyze_paste_prompt("회사에서 있었던 황당한 일\n부장이 어쩌고 저쩌고")
+    assert "핵심" in prompt and "JSON" in prompt
+    assert "그대로 옮기지" in prompt  # distill, not transcribe
+    assert "부장이 어쩌고" in prompt  # the pasted text is embedded for analysis
+
+
+def test_apply_analyzed_builds_candidate_from_distilled_json() -> None:
+    cand = ctrl.apply_analyzed('{"title": "반전 있는 회식 썰", "summary": "실적은 최고인데 회식은 최악"}')
+    assert cand.title == "반전 있는 회식 썰"
+    assert cand.excerpt == "실적은 최고인데 회식은 최악"
+    assert cand.source == "paste"
+
+
+def test_apply_analyzed_requires_summary() -> None:
+    with pytest.raises(ValueError):
+        ctrl.apply_analyzed('{"title": "제목만 있음"}')
