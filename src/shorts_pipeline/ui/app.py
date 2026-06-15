@@ -426,7 +426,15 @@ def _paste_source_input() -> None:
     pasted_text = st.text_area("복사한 글 내용", key="paste_content", height=200)
     pasted_url = st.text_input("출처 URL (선택)", value="", key="paste_url")
 
-    with st.expander("🟦 Claude Code로 분석 (핵심·반전 추출, 권장)", expanded=True):
+    if st.button("분석하기", type="primary"):
+        try:
+            cand = ctrl.analyze_pasted_content(pasted_text, pasted_url)
+            st.session_state["discovered"] = [cand.model_dump()]
+        except Exception as exc:
+            st.session_state.pop("discovered", None)
+            st.error(f"분석 실패: {_friendly_error(exc)}")
+
+    with st.expander("🟦 더 정교하게: Claude Code로 핵심·반전 추출 (선택)", expanded=False):
         if not pasted_text.strip():
             st.caption("먼저 위에 글을 붙여넣으세요.")
         else:
@@ -443,14 +451,6 @@ def _paste_source_input() -> None:
                 except Exception as exc:
                     st.session_state.pop("discovered", None)
                     st.error(f"분석 적용 실패: {_friendly_error(exc)}")
-
-    if st.button("빠른 분석 (자동, 핵심 추출은 약함)"):
-        try:
-            cand = ctrl.analyze_pasted_content(pasted_text, pasted_url)
-            st.session_state["discovered"] = [cand.model_dump()]
-        except Exception as exc:
-            st.session_state.pop("discovered", None)
-            st.error(f"분석 실패: {_friendly_error(exc)}")
 
 
 def _fetch_source_input(kind: str, query_label: str, default: str) -> None:
@@ -525,8 +525,10 @@ def _discovery_wizard() -> None:
         edited_why = st.text_input(
             "숏폼 적합 이유", value=seed["why_shortable"], key=f"draft_why_{picked}"
         )
-        col_full, col_create = st.columns(2)
-        submit_create = col_create.form_submit_button("프로젝트 만들기 (Claude Code 단계별)")
+        col_create, col_full = st.columns(2)
+        submit_create = col_create.form_submit_button(
+            "프로젝트 만들기 (Claude Code 단계별)", type="primary"
+        )
         submit_full = col_full.form_submit_button("이 내용으로 전체 초안 생성 (A→F, 더미)")
     if submit_full or submit_create:
         try:
